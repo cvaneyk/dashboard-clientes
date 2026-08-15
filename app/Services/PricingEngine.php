@@ -1,0 +1,200 @@
+<?php
+
+namespace App\Services;
+
+use App\Models\Linea;
+use App\Models\Override;
+use Carbon\Carbon;
+use Carbon\CarbonImmutable;
+use Illuminate\Support\Collection;
+
+/**
+ * Motor de precios del portal de clientes.
+ *
+ * REGLA DE NEGOCIO
+ * ----------------
+ * El coste que ve el cliente NO es el gasto real de la plataforma, sino el
+ * "objetivo del mes" (lo que se le va a facturar) repartido por días con la
+ * lógica de:  presupuesto restante / días activos restantes.
+ *
+ * Esto absorbe todos los casos que pediste:
+ *   - Prorrateo suave día a día.
+ *   - Subir/bajar el objetivo a mitad de mes (se re-nivela solo, sin tocar
+ *     los días ya pasados).
+ *   - Pausar una línea (0 €/día a partir de la pausa).
+ *   - Líneas que arrancan a mitad de mes (reparto sobre sus días activos).
+ *
+ * Las métricas reales (impresiones, clics, leads) salen del CSV; el CPC y el
+ * CPL del cliente se calculan con el coste-cliente sobre esas métricas reales.
+ */
+class PricingEngine
+{
+    /**
+     * Coste-cliente por día de una línea durante un mes concreto.
+     *
+     * @return Collection<string,float>  clave 'Y-m-d' => coste del día
+     */
+    public function costeClienteMes(Linea $linea, int $anio, int $mes): Collection
+    {
+        $inicioMes = CarbonImmutable::create($anio, $mes, 1)->startOfDay();
+        $diasMes   = $inicioMes->daysInMonth;
+
+        // Eventos de presupuesto ordenados por fecha (incluye el último vigente
+        // ANTES del mes, para arrastrar el objetivo con el que se entra al mes).
+        $eventos = $linea->presupuestoEventos()
+            ->orderBy('fecha_efectiva')
+            ->get(['fecha_efectiva', 'objetivo_mes', 'estado']);
+
+        $out       = collect();
+        $acumulado = 0.0;
+
+        for ($d = 1; $d <= $diasMes; $d++) {
+            $dia = $inicioMes->addDays($d - 1);
+
+            // Evento vigente para este día (el último con fecha_efectiva <= día).
+            $vigente = $eventos->last(
+                fn ($e) => Carbon::parse($e->fecha_efectiva)->lte($dia)
+            );
+
+            if (! $vigente || $vigente->estado === 'pausada') {
+                // Línea aún no arrancada este mes, o pausada: 0 €.
+                $out->put($dia->toDateString(), 0.0);
+                continue;
+            }
+
+            $objetivo      = (float) $vigente->objetivo_mes;
+            $restante      = max($objetivo - $acumulado, 0.0);
+            $diasRestantes = $diasMes - $d + 1;                 // incluye hoy
+            $costeDia      = $diasRestantes > 0 ? $restante / $diasRestantes : 0.0;
+
+            $acumulado += $costeDia;
+            $out->put($dia->toDateString(), round($costeDia, 2));
+        }
+
+        return $this->aplicarOverrides($linea, $out);
+    }
+
+    /**
+     * Coste-cliente acumulado de una línea entre dos fechas (ambas inclusive).
+     * Recorre mes a mes para respetar el prorrateo mensual.
+     */
+    public function costeClientePeriodo(Linea $linea, Carbon $desde, Carbon $hasta): float
+    {
+        $total  = 0.0;
+        $cursor = $desde->copy()->startOfMonth();
+
+        while ($cursor->lte($hasta)) {
+            $mesData = $this->costeClienteMes($linea, $cursor->year, $cursor->month);
+            foreach ($mesData as $fecha => $coste) {
+                $f = Carbon::parse($fecha);
+                if ($f->betweenIncluded($desde, $hasta)) {
+                    $total += $coste;
+                }
+            }
+            $cursor->addMonth();
+        }
+
+        return round($total, 2);
+    }
+
+    /**
+     * Resumen de KPIs del cliente para una línea (o conjunto) en un rango.
+     * Combina coste-cliente (calculado) con métricas reales (de metricas_diarias).
+     *
+     * @param  Collection<Linea>  $lineas
+     * @return array{coste:float,clics:int,leads:float,impresiones:int,cpc:float,cpl:float,ctr:float}
+     */
+    public function kpis(Collection $lineas, Carbon $desde, Carbon $hasta): array
+    {
+        $coste = 0.0;
+        foreach ($lineas as $linea) {
+            $coste += $this->costeClientePeriodo($linea, $desde, $hasta);
+        }
+
+        $ids = $lineas->pluck('id');
+        $reales = \App\Models\MetricaDiaria::whereIn('linea_id', $ids)
+            ->whereBetween('fecha', [$desde->toDateString(), $hasta->toDateString()])
+            ->selectRaw('SUM(clics) clics, SUM(leads) leads, SUM(impresiones) impresiones')
+            ->first();
+
+        $clics       = (int) ($reales->clics ?? 0);
+        $leads       = (float) ($reales->leads ?? 0);
+        $impresiones = (int) ($reales->impresiones ?? 0);
+
+        return [
+            'coste'       => round($coste, 2),
+            'clics'       => $clics,
+            'leads'       => $leads,
+            'impresiones' => $impresiones,
+            'cpc'         => $clics > 0 ? round($coste / $clics, 2) : 0.0,
+            'cpl'         => $leads > 0 ? round($coste / $leads, 2) : 0.0,
+            'ctr'         => $impresiones > 0 ? round($clics / $impresiones * 100, 2) : 0.0,
+        ];
+    }
+
+    /**
+     * Serie diaria combinada (para el gráfico del dashboard): por cada día,
+     * coste-cliente + métricas reales.
+     *
+     * @return Collection<string,array>
+     */
+    public function serieDiaria(Linea $linea, int $anio, int $mes): Collection
+    {
+        $coste  = $this->costeClienteMes($linea, $anio, $mes);
+        $reales = \App\Models\MetricaDiaria::where('linea_id', $linea->id)
+            ->whereYear('fecha', $anio)->whereMonth('fecha', $mes)
+            ->get()->keyBy(fn ($m) => Carbon::parse($m->fecha)->toDateString());
+
+        return $coste->map(function ($costeDia, $fecha) use ($reales) {
+            $r = $reales->get($fecha);
+            $clics = (int) ($r->clics ?? 0);
+            $leads = (float) ($r->leads ?? 0);
+            return [
+                'fecha' => $fecha,
+                'coste' => $costeDia,
+                'clics' => $clics,
+                'leads' => $leads,
+                'cpc'   => $clics > 0 ? round($costeDia / $clics, 2) : 0.0,
+                'cpl'   => $leads > 0 ? round($costeDia / $leads, 2) : 0.0,
+                'gasto_real' => (float) ($r->gasto_real ?? 0), // solo uso interno
+            ];
+        });
+    }
+
+    /**
+     * Aplica los ajustes manuales del account manager sobre el coste diario.
+     * Override con fecha concreta: pisa ese día. Override sin fecha: reparte el
+     * importe entre los días del mes de forma proporcional al cálculo original.
+     */
+    protected function aplicarOverrides(Linea $linea, Collection $costeDiario): Collection
+    {
+        $overrides = Override::where('linea_id', $linea->id)
+            ->where('campo', 'coste_cliente')
+            ->get();
+
+        if ($overrides->isEmpty()) {
+            return $costeDiario;
+        }
+
+        // 1) Overrides por día concreto.
+        foreach ($overrides->whereNotNull('fecha') as $ov) {
+            $f = Carbon::parse($ov->fecha)->toDateString();
+            if ($costeDiario->has($f)) {
+                $costeDiario->put($f, round((float) $ov->valor, 2));
+            }
+        }
+
+        // 2) Override de mes completo (redistribuye el total indicado).
+        $mesOv = $overrides->whereNull('fecha')->last();
+        if ($mesOv) {
+            $totalActual = array_sum($costeDiario->all());
+            $objetivo    = (float) $mesOv->valor;
+            if ($totalActual > 0) {
+                $factor = $objetivo / $totalActual;
+                $costeDiario = $costeDiario->map(fn ($c) => round($c * $factor, 2));
+            }
+        }
+
+        return $costeDiario;
+    }
+}
