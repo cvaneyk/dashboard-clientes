@@ -15,11 +15,17 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // User::factory(10)->create();
+        // Usuario admin interno (accede al panel Filament en /admin).
+        User::updateOrCreate(
+            ['email' => 'admin@olimedia.es'],
+            [
+                'name'     => 'OliMedia Admin',
+                'password' => \Illuminate\Support\Facades\Hash::make('cambiar-esto'),
+                'es_admin' => true,
+            ]
+        );
 
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-        ]);
+        // Datos piloto de La Salle (cliente + dashboard).
+        $this->call(PortalDemoSeeder::class);
     }
 }
