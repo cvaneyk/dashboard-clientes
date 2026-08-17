@@ -25,8 +25,13 @@ class Linea extends Model
     /** Normaliza un nombre de campaña/adset para emparejar (quita emojis y espacios). */
     public static function normalizar(string $nombre): string
     {
-        // Quita emojis y símbolos, colapsa espacios, minúsculas.
-        $limpio = preg_replace('/[\x{1F000}-\x{1FAFF}\x{2600}-\x{27BF}\x{FE0F}]/u', '', $nombre);
+        // Quita emojis y símbolos (flechas, geométricos, pictogramas, selectores
+        // de variación y ZWJ), colapsa espacios y pasa a minúsculas.
+        $limpio = preg_replace(
+            '/[\x{1F000}-\x{1FAFF}\x{2190}-\x{2BFF}\x{2600}-\x{27BF}\x{FE0F}\x{200D}]/u',
+            '',
+            $nombre
+        );
         $limpio = trim(preg_replace('/\s+/', ' ', (string) $limpio));
         return Str::lower($limpio);
     }
