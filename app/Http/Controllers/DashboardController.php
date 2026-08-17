@@ -5,13 +5,15 @@ namespace App\Http\Controllers;
 use App\Models\MetricaDiaria;
 use App\Services\PricingEngine;
 use Carbon\Carbon;
+use Carbon\CarbonPeriod;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 
 /**
- * Dashboard del cliente. Solo ve los datos de SU cliente (scope por cliente_id).
- * Muestra: consolidado del mes, desglose por canal y por campaña.
+ * Dashboard del cliente. Exporta TODO el dataset diario (por campaña y canal)
+ * al navegador; el filtrado, comparación, orden, búsqueda y gráfico se resuelven
+ * en el cliente (JS) sin recargar. Scope estricto por cliente_id.
  */
 class DashboardController extends Controller
 {
@@ -27,111 +29,99 @@ class DashboardController extends Controller
         $user    = Auth::user();
         $cliente = $user->cliente;
 
-        $mesActual = $this->resolverMes($request->query('mes'), $cliente->id);
-        $anio      = (int) $mesActual->year;
-        $mes       = (int) $mesActual->month;
-        $desde     = $mesActual->copy()->startOfMonth();
-        $hasta     = $mesActual->copy()->endOfMonth();
+        $lineas = $cliente->lineas()->where('activo', true)->get();
 
-        $lineas = $cliente->lineas()->where('activo', true)->orderBy('nombre')->get();
-
-        // KPIs consolidados (todos los canales).
-        $kpis = $engine->kpis($lineas, $desde, $hasta);
-
-        // Serie diaria consolidada.
-        $dias  = $desde->daysInMonth;
-        $serie = [];
-        for ($d = 1; $d <= $dias; $d++) {
-            $fecha = $desde->copy()->day($d)->toDateString();
-            $serie[$fecha] = ['coste' => 0.0, 'clics' => 0, 'leads' => 0.0];
+        // Ventana temporal = rango de fechas con datos del cliente.
+        $min = MetricaDiaria::where('cliente_id', $cliente->id)->min('fecha');
+        $max = MetricaDiaria::where('cliente_id', $cliente->id)->max('fecha');
+        if (! $min || ! $max) {
+            $min = Carbon::now()->startOfMonth()->toDateString();
+            $max = Carbon::now()->toDateString();
         }
+        $ini = Carbon::parse($min)->startOfDay();
+        $fin = Carbon::parse($max)->startOfDay();
+
+        // Métricas reales por línea y día.
+        $metricas = MetricaDiaria::whereIn('linea_id', $lineas->pluck('id'))
+            ->whereBetween('fecha', [$ini->toDateString(), $fin->toDateString()])
+            ->get(['linea_id', 'fecha', 'clics', 'leads', 'impresiones'])
+            ->groupBy('linea_id');
+
+        // Coste-cliente diario por línea (recorriendo los meses de la ventana).
+        $meses = [];
+        $cursor = $ini->copy()->startOfMonth();
+        while ($cursor->lte($fin)) {
+            $meses[] = [$cursor->year, $cursor->month];
+            $cursor->addMonth();
+        }
+
+        $rows = [];
         foreach ($lineas as $linea) {
-            foreach ($engine->serieDiaria($linea, $anio, $mes) as $fecha => $row) {
-                if (! isset($serie[$fecha])) {
+            $nombre = $linea->producto ?: $linea->nombre;
+            $plat   = $linea->plataforma;
+
+            // coste por fecha
+            $coste = [];
+            foreach ($meses as [$y, $m]) {
+                foreach ($engine->costeClienteMes($linea, $y, $m) as $f => $c) {
+                    $coste[$f] = $c;
+                }
+            }
+
+            // métricas por fecha
+            $mets = [];
+            foreach (($metricas[$linea->id] ?? collect()) as $r) {
+                $f = Carbon::parse($r->fecha)->toDateString();
+                $mets[$f] = [
+                    'k' => (int) $r->clics,
+                    'l' => (float) $r->leads,
+                    'i' => (int) $r->impresiones,
+                ];
+            }
+
+            // union de fechas dentro de la ventana
+            $fechas = array_unique(array_merge(array_keys($coste), array_keys($mets)));
+            foreach ($fechas as $f) {
+                if ($f < $ini->toDateString() || $f > $fin->toDateString()) {
                     continue;
                 }
-                $serie[$fecha]['coste'] += $row['coste'];
-                $serie[$fecha]['clics'] += $row['clics'];
-                $serie[$fecha]['leads'] += $row['leads'];
+                $c = round($coste[$f] ?? 0, 2);
+                $k = $mets[$f]['k'] ?? 0;
+                $l = $mets[$f]['l'] ?? 0;
+                $i = $mets[$f]['i'] ?? 0;
+                if ($c == 0 && $k == 0 && $l == 0 && $i == 0) {
+                    continue;
+                }
+                $rows[] = [
+                    'f'    => $f,
+                    'p'    => $plat,
+                    'camp' => $nombre,
+                    'c'    => $c,
+                    'k'    => $k,
+                    'l'    => $l,
+                    'i'    => $i,
+                ];
             }
         }
 
-        // Coste-cliente por línea (para reutilizar en canal y campaña).
-        $costeLinea = [];
-        foreach ($lineas as $l) {
-            $costeLinea[$l->id] = $engine->costeClientePeriodo($l, $desde, $hasta);
+        $canales = array_values(array_unique(array_map(fn ($r) => $r['p'], $rows)));
+
+        // Logo: si es una ruta guardada (no URL), la resolvemos al disco público.
+        $logoUrl = $cliente->logo;
+        if ($logoUrl && ! str_starts_with($logoUrl, 'http')) {
+            $logoUrl = \Illuminate\Support\Facades\Storage::disk('public')->url($logoUrl);
         }
 
-        // Métricas reales por línea en el mes.
-        $reales = MetricaDiaria::whereIn('linea_id', $lineas->pluck('id'))
-            ->whereBetween('fecha', [$desde->toDateString(), $hasta->toDateString()])
-            ->selectRaw('linea_id, SUM(clics) clics, SUM(leads) leads, SUM(impresiones) imp')
-            ->groupBy('linea_id')
-            ->get()
-            ->keyBy('linea_id');
+        $data = [
+            'rows'     => $rows,
+            'canales'  => $canales,
+            'nombres'  => self::CANALES,
+            'min'      => $ini->toDateString(),
+            'max'      => $fin->toDateString(),
+            'cliente'  => $cliente->nombre,
+            'logo'     => $logoUrl,
+        ];
 
-        // Desglose POR CANAL.
-        $porCanal = $lineas->groupBy('plataforma')->map(function ($lins, $plat) use ($costeLinea, $reales) {
-            $coste = $clics = $leads = $imp = 0;
-            foreach ($lins as $l) {
-                $coste += $costeLinea[$l->id] ?? 0;
-                $r = $reales->get($l->id);
-                $clics += (int) ($r->clics ?? 0);
-                $leads += (float) ($r->leads ?? 0);
-                $imp   += (int) ($r->imp ?? 0);
-            }
-            return [
-                'plataforma' => $plat,
-                'nombre'     => self::CANALES[$plat] ?? ucfirst($plat),
-                'coste'      => round($coste, 2),
-                'clics'      => $clics,
-                'leads'      => $leads,
-                'imp'        => $imp,
-                'cpc'        => $clics > 0 ? round($coste / $clics, 2) : 0.0,
-                'cpl'        => $leads > 0 ? round($coste / $leads, 2) : 0.0,
-            ];
-        })->sortByDesc('coste')->values();
-
-        // Desglose POR CAMPAÑA (con su canal).
-        $porLinea = $lineas->map(function ($l) use ($costeLinea, $reales) {
-            $coste = $costeLinea[$l->id] ?? 0;
-            $r     = $reales->get($l->id);
-            $clics = (int) ($r->clics ?? 0);
-            $leads = (float) ($r->leads ?? 0);
-            return [
-                'nombre'     => $l->producto ?: $l->nombre,
-                'plataforma' => self::CANALES[$l->plataforma] ?? ucfirst($l->plataforma),
-                'coste'      => round($coste, 2),
-                'clics'      => $clics,
-                'leads'      => $leads,
-                'cpc'        => $clics > 0 ? round($coste / $clics, 2) : 0.0,
-                'cpl'        => $leads > 0 ? round($coste / $leads, 2) : 0.0,
-            ];
-        })->sortByDesc('coste')->values();
-
-        $meses = MetricaDiaria::where('cliente_id', $cliente->id)
-            ->selectRaw("DATE_FORMAT(fecha, '%Y-%m') ym")
-            ->distinct()->orderByDesc('ym')->pluck('ym');
-
-        return view('portal.dashboard', [
-            'cliente'   => $cliente,
-            'kpis'      => $kpis,
-            'serie'     => $serie,
-            'porCanal'  => $porCanal,
-            'porLinea'  => $porLinea,
-            'mesActual' => $mesActual,
-            'meses'     => $meses,
-        ]);
-    }
-
-    protected function resolverMes(?string $mesParam, int $clienteId): Carbon
-    {
-        if ($mesParam && preg_match('/^\d{4}-\d{2}$/', $mesParam)) {
-            return Carbon::createFromFormat('Y-m', $mesParam)->startOfMonth();
-        }
-
-        $ultima = MetricaDiaria::where('cliente_id', $clienteId)->max('fecha');
-
-        return $ultima ? Carbon::parse($ultima)->startOfMonth() : Carbon::now()->startOfMonth();
+        return view('portal.dashboard', ['cliente' => $cliente, 'data' => $data, 'logoUrl' => $logoUrl]);
     }
 }

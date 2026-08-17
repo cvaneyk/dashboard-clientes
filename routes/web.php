@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AccountController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\DashboardController;
 use Illuminate\Support\Facades\Auth;
@@ -20,4 +21,8 @@ Route::middleware('auth')->group(function () {
     });
 
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('portal.dashboard');
+
+    // Mi cuenta (cambio de contraseña del cliente).
+    Route::get('/cuenta', [AccountController::class, 'edit'])->name('portal.cuenta');
+    Route::post('/cuenta', [AccountController::class, 'update'])->name('portal.cuenta.update');
 });

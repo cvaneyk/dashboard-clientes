@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Clientes\Schemas;
 
 use Filament\Forms\Components\ColorPicker;
+use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Schema;
@@ -26,9 +27,14 @@ class ClienteForm
                     ->required()
                     ->unique(ignoreRecord: true)
                     ->helperText('Se genera solo a partir del nombre; puedes editarlo.'),
-                TextInput::make('logo')
-                    ->label('Logo (URL, opcional)')
-                    ->url(),
+                FileUpload::make('logo')
+                    ->label('Logotipo del cliente')
+                    ->image()
+                    ->disk('public')
+                    ->directory('logos')
+                    ->visibility('public')
+                    ->imageEditor()
+                    ->helperText('Se mostrará en la cabecera de su dashboard.'),
                 ColorPicker::make('color')
                     ->label('Color de marca'),
                 Toggle::make('activo')

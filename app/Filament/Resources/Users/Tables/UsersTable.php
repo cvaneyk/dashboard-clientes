@@ -5,8 +5,8 @@ namespace App\Filament\Resources\Users\Tables;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
-use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 
 class UsersTable
@@ -15,6 +15,11 @@ class UsersTable
     {
         return $table
             ->columns([
+                TextColumn::make('tipo')
+                    ->label('Tipo')
+                    ->badge()
+                    ->getStateUsing(fn ($record) => $record->es_admin ? 'Administrador' : 'Cliente')
+                    ->color(fn (string $state) => $state === 'Administrador' ? 'warning' : 'success'),
                 TextColumn::make('name')
                     ->label('Nombre')
                     ->searchable()
@@ -23,14 +28,18 @@ class UsersTable
                     ->label('Email')
                     ->searchable(),
                 TextColumn::make('cliente.nombre')
-                    ->label('Cliente')
-                    ->placeholder('— (interno)')
+                    ->label('Cliente asignado')
+                    ->placeholder('— (usuario interno)')
                     ->searchable(),
-                IconColumn::make('es_admin')
-                    ->label('Admin')
-                    ->boolean(),
             ])
-            ->defaultSort('name')
+            ->filters([
+                TernaryFilter::make('es_admin')
+                    ->label('Tipo de usuario')
+                    ->placeholder('Todos')
+                    ->trueLabel('Solo administradores')
+                    ->falseLabel('Solo clientes'),
+            ])
+            ->defaultSort('es_admin', 'desc')
             ->recordActions([
                 EditAction::make(),
             ])
