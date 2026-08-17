@@ -4,7 +4,6 @@ namespace App\Filament\Resources\Users\Schemas;
 
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Schema;
 
 class UserForm
@@ -13,6 +12,17 @@ class UserForm
     {
         return $schema
             ->components([
+                Select::make('es_admin')
+                    ->label('Tipo de usuario')
+                    ->native(false)
+                    ->options([
+                        '0' => 'Cliente — accede solo a su dashboard',
+                        '1' => 'Administrador — accede al panel de gestión',
+                    ])
+                    ->default('0')
+                    ->formatStateUsing(fn ($state) => $state ? '1' : '0')
+                    ->required()
+                    ->helperText('Define a qué parte del sistema accede este usuario.'),
                 TextInput::make('name')
                     ->label('Nombre')
                     ->required(),
@@ -22,14 +32,11 @@ class UserForm
                     ->required()
                     ->unique(ignoreRecord: true),
                 Select::make('cliente_id')
-                    ->label('Cliente')
+                    ->label('Cliente asignado')
                     ->relationship('cliente', 'nombre')
                     ->searchable()
                     ->preload()
-                    ->helperText('Déjalo vacío solo para usuarios internos (administradores).'),
-                Toggle::make('es_admin')
-                    ->label('Es administrador (accede al panel /admin)')
-                    ->default(false),
+                    ->helperText('Obligatorio para usuarios de tipo Cliente. Déjalo vacío para administradores.'),
                 TextInput::make('password')
                     ->label('Contraseña')
                     ->password()

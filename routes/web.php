@@ -3,8 +3,19 @@
 use App\Http\Controllers\AccountController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\DashboardController;
+use App\Models\Cliente;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Storage;
+
+// Logo del cliente (servido desde el disco público, sin necesidad de storage:link).
+Route::get('/media/logo/{cliente}', function (Cliente $cliente) {
+    abort_unless($cliente->logo && ! str_starts_with($cliente->logo, 'http'), 404);
+    $disk = Storage::disk('public');
+    abort_unless($disk->exists($cliente->logo), 404);
+
+    return response()->file($disk->path($cliente->logo));
+})->name('cliente.logo');
 
 // Login del portal de clientes.
 Route::get('/login', [LoginController::class, 'show'])->name('portal.login');

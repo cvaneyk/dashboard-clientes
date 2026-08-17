@@ -106,10 +106,13 @@ class DashboardController extends Controller
 
         $canales = array_values(array_unique(array_map(fn ($r) => $r['p'], $rows)));
 
-        // Logo: si es una ruta guardada (no URL), la resolvemos al disco público.
-        $logoUrl = $cliente->logo;
-        if ($logoUrl && ! str_starts_with($logoUrl, 'http')) {
-            $logoUrl = \Illuminate\Support\Facades\Storage::disk('public')->url($logoUrl);
+        // Logo: si es una URL completa, se usa tal cual; si es un archivo subido,
+        // se sirve por nuestra ruta propia (no depende de storage:link).
+        $logoUrl = null;
+        if ($cliente->logo) {
+            $logoUrl = str_starts_with($cliente->logo, 'http')
+                ? $cliente->logo
+                : route('cliente.logo', $cliente);
         }
 
         $data = [

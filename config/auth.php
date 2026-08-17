@@ -38,7 +38,14 @@ return [
     */
 
     'guards' => [
+        // Clientes (dashboard en /login, /dashboard).
         'web' => [
+            'driver' => 'session',
+            'provider' => 'users',
+        ],
+        // Administradores internos (panel Filament en /admin). Guard aparte para
+        // que un admin y un cliente puedan estar logueados a la vez sin colisionar.
+        'admin' => [
             'driver' => 'session',
             'provider' => 'users',
         ],
