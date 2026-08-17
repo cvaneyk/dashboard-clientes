@@ -16,27 +16,26 @@ class ClientesTable
         return $table
             ->columns([
                 TextColumn::make('nombre')
-                    ->searchable(),
+                    ->label('Nombre')
+                    ->searchable()
+                    ->sortable(),
                 TextColumn::make('slug')
+                    ->label('Slug')
                     ->searchable(),
-                TextColumn::make('logo')
-                    ->searchable(),
-                TextColumn::make('color')
-                    ->searchable(),
+                TextColumn::make('lineas_count')
+                    ->label('Líneas')
+                    ->counts('lineas')
+                    ->badge(),
                 IconColumn::make('activo')
+                    ->label('Activo')
                     ->boolean(),
                 TextColumn::make('created_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('updated_at')
-                    ->dateTime()
+                    ->label('Creado')
+                    ->dateTime('d/m/Y')
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
-            ->filters([
-                //
-            ])
+            ->defaultSort('nombre')
             ->recordActions([
                 EditAction::make(),
             ])

@@ -15,28 +15,21 @@ class CuentasTable
     {
         return $table
             ->columns([
-                TextColumn::make('cliente.id')
-                    ->searchable(),
+                TextColumn::make('cliente.nombre')
+                    ->label('Cliente')
+                    ->searchable()
+                    ->sortable(),
                 TextColumn::make('plataforma')
-                    ->searchable(),
+                    ->label('Plataforma')
+                    ->badge(),
                 TextColumn::make('nombre_cuenta')
-                    ->searchable(),
-                TextColumn::make('external_id')
+                    ->label('Cuenta')
                     ->searchable(),
                 IconColumn::make('activo')
+                    ->label('Activa')
                     ->boolean(),
-                TextColumn::make('created_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('updated_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
             ])
-            ->filters([
-                //
-            ])
+            ->defaultSort('cliente.nombre')
             ->recordActions([
                 EditAction::make(),
             ])

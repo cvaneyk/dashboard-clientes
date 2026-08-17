@@ -14,15 +14,28 @@ class CuentaForm
         return $schema
             ->components([
                 Select::make('cliente_id')
-                    ->relationship('cliente', 'id')
+                    ->label('Cliente')
+                    ->relationship('cliente', 'nombre')
+                    ->searchable()
+                    ->preload()
                     ->required(),
-                TextInput::make('plataforma')
+                Select::make('plataforma')
+                    ->label('Plataforma')
+                    ->options([
+                        'meta'     => 'Meta Ads',
+                        'google'   => 'Google Ads',
+                        'tiktok'   => 'TikTok Ads',
+                        'linkedin' => 'LinkedIn Ads',
+                    ])
                     ->required(),
                 TextInput::make('nombre_cuenta')
+                    ->label('Nombre de la cuenta')
                     ->required(),
-                TextInput::make('external_id'),
+                TextInput::make('external_id')
+                    ->label('ID de cuenta en la plataforma (opcional)'),
                 Toggle::make('activo')
-                    ->required(),
+                    ->label('Activa')
+                    ->default(true),
             ]);
     }
 }

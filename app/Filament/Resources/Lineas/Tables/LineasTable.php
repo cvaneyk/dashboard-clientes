@@ -15,34 +15,28 @@ class LineasTable
     {
         return $table
             ->columns([
-                TextColumn::make('cliente.id')
-                    ->searchable(),
-                TextColumn::make('cuenta.id')
-                    ->searchable(),
-                TextColumn::make('plataforma')
-                    ->searchable(),
+                TextColumn::make('cliente.nombre')
+                    ->label('Cliente')
+                    ->searchable()
+                    ->sortable(),
                 TextColumn::make('nombre')
+                    ->label('Campaña / adset')
                     ->searchable(),
                 TextColumn::make('producto')
-                    ->searchable(),
-                TextColumn::make('match_key')
-                    ->searchable(),
+                    ->label('Producto')
+                    ->toggleable(),
+                TextColumn::make('plataforma')
+                    ->label('Plataforma')
+                    ->badge(),
                 TextColumn::make('nivel')
-                    ->searchable(),
+                    ->label('Nivel')
+                    ->badge()
+                    ->toggleable(),
                 IconColumn::make('activo')
+                    ->label('Activa')
                     ->boolean(),
-                TextColumn::make('created_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('updated_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
             ])
-            ->filters([
-                //
-            ])
+            ->defaultSort('cliente.nombre')
             ->recordActions([
                 EditAction::make(),
             ])

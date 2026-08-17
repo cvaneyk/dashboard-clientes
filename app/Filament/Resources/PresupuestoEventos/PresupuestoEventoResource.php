@@ -20,7 +20,16 @@ class PresupuestoEventoResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
 
-    protected static ?string $recordTitleAttribute = 'PresupuestoEvento';
+    protected static ?string $recordTitleAttribute = 'objetivo_mes';
+
+    protected static ?string $modelLabel = 'Presupuesto';
+
+    protected static ?string $pluralModelLabel = 'Presupuestos';
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false; // Se gestiona dentro de cada Línea (no como sección aparte).
+    }
 
     public static function form(Schema $schema): Schema
     {

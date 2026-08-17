@@ -20,7 +20,11 @@ class CuentaResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
 
-    protected static ?string $recordTitleAttribute = 'Cuenta';
+    protected static ?string $recordTitleAttribute = 'nombre_cuenta';
+
+    protected static ?string $modelLabel = 'Cuenta';
+
+    protected static ?string $pluralModelLabel = 'Cuentas';
 
     public static function form(Schema $schema): Schema
     {

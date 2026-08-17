@@ -20,7 +20,16 @@ class MetricaDiariaResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
 
-    protected static ?string $recordTitleAttribute = 'MetricaDiaria';
+    protected static ?string $recordTitleAttribute = 'fecha';
+
+    protected static ?string $modelLabel = 'Métrica diaria';
+
+    protected static ?string $pluralModelLabel = 'Métricas diarias';
+
+    public static function canCreate(): bool
+    {
+        return false; // Las métricas entran por el importador de CSV, no a mano.
+    }
 
     public static function form(Schema $schema): Schema
     {

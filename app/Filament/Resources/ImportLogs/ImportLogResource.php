@@ -20,7 +20,16 @@ class ImportLogResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
 
-    protected static ?string $recordTitleAttribute = 'ImportLog';
+    protected static ?string $recordTitleAttribute = 'fichero';
+
+    protected static ?string $modelLabel = 'Importación';
+
+    protected static ?string $pluralModelLabel = 'Importaciones';
+
+    public static function canCreate(): bool
+    {
+        return false; // Se generan solas al importar CSV.
+    }
 
     public static function form(Schema $schema): Schema
     {

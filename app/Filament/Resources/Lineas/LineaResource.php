@@ -20,7 +20,11 @@ class LineaResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
 
-    protected static ?string $recordTitleAttribute = 'Linea';
+    protected static ?string $recordTitleAttribute = 'nombre';
+
+    protected static ?string $modelLabel = 'Línea';
+
+    protected static ?string $pluralModelLabel = 'Líneas';
 
     public static function form(Schema $schema): Schema
     {
