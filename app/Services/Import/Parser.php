@@ -40,9 +40,21 @@ abstract class Parser
     /** Extrae una fecha Y-m-d de un valor de texto; null si no es una fecha. */
     protected function fecha($v): ?string
     {
-        if (preg_match('/(\d{4}-\d{2}-\d{2})/', trim((string) $v), $m)) {
-            return $m[1];
+        $s = trim((string) $v);
+
+        // Formato ISO: 2026-04-20
+        if (preg_match('/(\d{4})-(\d{2})-(\d{2})/', $s, $m)) {
+            return $m[1] . '-' . $m[2] . '-' . $m[3];
         }
+
+        // Formato español: 01/04/2026 (DD/MM/AAAA) o DD/MM/AA
+        if (preg_match('#(\d{1,2})/(\d{1,2})/(\d{2,4})#', $s, $m)) {
+            $d  = str_pad($m[1], 2, '0', STR_PAD_LEFT);
+            $mo = str_pad($m[2], 2, '0', STR_PAD_LEFT);
+            $y  = strlen($m[3]) === 2 ? ('20' . $m[3]) : $m[3];
+            return $y . '-' . $mo . '-' . $d;
+        }
+
         return null;
     }
 
