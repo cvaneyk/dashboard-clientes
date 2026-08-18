@@ -5,6 +5,7 @@ namespace App\Filament\Resources\ImportLogs\Tables;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
+use Filament\Actions\EditAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 
@@ -44,6 +45,8 @@ class ImportLogsTable
             ])
             ->defaultSort('created_at', 'desc')
             ->recordActions([
+                EditAction::make()
+                    ->label('Editar'),
                 DeleteAction::make()
                     ->label('Eliminar')
                     ->modalHeading('Eliminar importación')
