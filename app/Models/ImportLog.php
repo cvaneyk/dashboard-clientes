@@ -16,4 +16,15 @@ class ImportLog extends Model
         'periodo_fin'    => 'date',
         'resumen'        => 'array',
     ];
+
+    /**
+     * Al eliminar una importación, se borran también las métricas que cargó
+     * (para poder "deshacer" un informe mal subido y volver a importarlo limpio).
+     */
+    protected static function booted(): void
+    {
+        static::deleting(function (ImportLog $log) {
+            MetricaDiaria::where('import_id', $log->id)->delete();
+        });
+    }
 }
