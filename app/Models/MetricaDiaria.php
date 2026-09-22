@@ -14,7 +14,11 @@ class MetricaDiaria extends Model
         'extra', 'import_id',
     ];
     protected $casts = [
-        'fecha'      => 'date',
+        // 'date:Y-m-d' (no 'date') para que se guarde exactamente como Y-m-d.
+        // Con 'date' se escribía 'Y-m-d H:i:s': MySQL lo truncaba por ser columna
+        // DATE, pero en otros motores queda la hora pegada y entonces el upsert
+        // por (cuenta_id, match_key, fecha) deja de casar y revienta el índice único.
+        'fecha'      => 'date:Y-m-d',
         'gasto_real' => 'decimal:2',
         'leads'      => 'decimal:2',
         'extra'      => 'array',

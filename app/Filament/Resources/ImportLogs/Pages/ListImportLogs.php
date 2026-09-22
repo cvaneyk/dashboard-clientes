@@ -52,12 +52,13 @@ class ListImportLogs extends ListRecords
                         Notification::make()
                             ->title('Importación completada')
                             ->body(sprintf(
-                                '%d filas · %d líneas nuevas · %s € · %s → %s',
+                                '%d filas · %d líneas nuevas · %s € · %s → %s%s',
                                 $res['filas'],
                                 $res['lineas_nuevas'],
                                 number_format($res['gasto_real'], 2, ',', '.'),
                                 $res['periodo_inicio'] ?? '?',
-                                $res['periodo_fin'] ?? '?'
+                                $res['periodo_fin'] ?? '?',
+                                $res['filas_error'] > 0 ? sprintf(' · %d filas descartadas', $res['filas_error']) : ''
                             ))
                             ->success()
                             ->persistent()

@@ -26,6 +26,11 @@ class ImportLogsTable
                 TextColumn::make('plataforma')
                     ->label('Plataforma')
                     ->badge(),
+                TextColumn::make('origen')
+                    ->label('Origen')
+                    ->badge()
+                    ->formatStateUsing(fn (?string $state) => $state === 'api' ? 'API' : 'Manual')
+                    ->color(fn (?string $state) => $state === 'api' ? 'success' : 'gray'),
                 TextColumn::make('fichero')
                     ->label('Archivo')
                     ->searchable()
@@ -42,6 +47,11 @@ class ImportLogsTable
                     ->label('Filas')
                     ->numeric()
                     ->sortable(),
+                TextColumn::make('filas_error')
+                    ->label('Descartadas')
+                    ->numeric()
+                    ->color(fn ($state) => $state > 0 ? 'warning' : 'gray')
+                    ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->defaultSort('created_at', 'desc')
             ->recordActions([

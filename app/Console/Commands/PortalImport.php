@@ -46,6 +46,10 @@ class PortalImport extends Command
             $res['periodo_fin'] ?? '?'
         ));
 
+        if ($res['filas_error'] > 0) {
+            $this->warn(sprintf('%d filas descartadas por no traer campaña o fecha.', $res['filas_error']));
+        }
+
         return self::SUCCESS;
     }
 }

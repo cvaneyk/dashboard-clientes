@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\ImportLogs\Schemas;
 
 use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Textarea;
 use Filament\Schemas\Schema;
@@ -16,6 +17,14 @@ class ImportLogForm
                 TextInput::make('cliente_id')
                     ->numeric(),
                 TextInput::make('plataforma')
+                    ->required(),
+                Select::make('origen')
+                    ->label('Origen')
+                    ->options([
+                        'manual' => 'Archivo subido a mano',
+                        'api'    => 'Sincronización por API',
+                    ])
+                    ->default('manual')
                     ->required(),
                 TextInput::make('fichero'),
                 DatePicker::make('periodo_inicio'),

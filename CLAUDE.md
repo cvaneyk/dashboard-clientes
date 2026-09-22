@@ -123,17 +123,40 @@ hay que crear `app/Filament/Resources/Overrides/`.
 - `lineas` — campaña/adset presupuestada; `match_key` normalizada, `nivel` (`campania|adset`).
 - `presupuesto_eventos` — línea temporal del objetivo mensual (la flexibilidad vive aquí).
 - `metricas_diarias` — cifras **reales** por día y línea. **Único por `(cuenta_id, match_key, fecha)`**
-  → es lo que permite el upsert idempotente. Guarda `import_id`.
+  → es lo que permite el upsert idempotente. Guarda `import_id`. El cast de `fecha` es
+  `date:Y-m-d` **a propósito**: con `date` se escribía `Y-m-d H:i:s` y el upsert dejaba de casar
+  en cualquier motor que no trunque como la columna DATE de MySQL.
 - `overrides` — ajustes manuales.
-- `import_logs` — auditoría de importaciones.
+- `import_logs` — auditoría de importaciones, con `origen` (`manual|api`) y `filas_error`.
 - `users` — + `cliente_id`, `es_admin`.
 
 ---
 
 ## 6. Importador: cómo funciona y dónde se falla
 
-Flujo: se sube el archivo **a una Cuenta concreta**, la cuenta define cliente y plataforma, y esa
-plataforma elige el parser. La acción "Importar informe" vive en
+[CampaignImporter](app/Services/Import/CampaignImporter.php) tiene **dos puntos de entrada** que
+acaban en el mismo sitio:
+
+- `import(Cuenta, $path)` — informe descargado a mano. Elige el parser según la plataforma de la
+  cuenta y delega en el siguiente. Es lo que usan la acción de Filament y `portal:import`.
+- `importRows(Cuenta, $rows, $meta)` — filas **ya normalizadas**. Es el punto de entrada para la
+  sincronización por API.
+
+Una fila normalizada es la que produce `Parser::make()`. De sus claves, **`match_key` y `fecha` son
+obligatorias** (identifican la fila); el resto se dan por 0 si faltan, para que un conector de API
+no tenga que rellenar métricas que su plataforma no devuelve. Las filas sin campaña o sin fecha se
+descartan y se cuentan en `import_logs.filas_error`.
+
+`$meta` admite `origen` (`manual|api`), `fichero` y `user_id` (por defecto `Auth::id()`, null en
+procesos automáticos).
+
+**Las fechas deben llegar ya en `Y-m-d` a `importRows()`.** Se aceptan objetos fecha y cadenas que
+empiecen por `Y-m-d` (con o sin hora); cualquier otra cosa se descarta a propósito, porque
+`01/04/2026` es el 1 de abril en España y el 4 de enero en formato americano y aquí no se adivina.
+Convertir fechas españolas es trabajo del `Parser`.
+
+El flujo de usuario no cambia: se sube el archivo **a una Cuenta concreta**, la cuenta define
+cliente y plataforma, y esa plataforma elige el parser. La acción "Importar informe" vive en
 [ListImportLogs.php](app/Filament/Resources/ImportLogs/Pages/ListImportLogs.php).
 
 - `Linea::normalizar()` quita emojis/símbolos y pasa a minúsculas (Meta los usa como prefijo:
@@ -186,6 +209,10 @@ con logos SVG inline, tabla de campañas con borde de color por canal, export CS
   `costeClienteMes`). Mantén ese idioma; el código es mixto español/inglés por convención de
   Laravel, no lo uniformes.
 - `.env` está en `.gitignore` y **no se sube**. No escribas credenciales en el repo ni en docs.
+- **`DatabaseSeeder` corre en producción en cada push** (`db:seed --force` del deploy). Solo puede
+  contener operaciones repetibles que no pisen datos reales: comprueba antes de crear y nunca
+  escribas contraseñas fijas ni datos de ejemplo ahí. Los datos de demo están en
+  `PortalDemoSeeder`, que se lanza a mano y se niega a correr en producción.
 - Si un commit deja `.git/index.lock` o `.git/HEAD.lock` bloqueando, bórralos antes del push.
 
 Comandos útiles:
