@@ -27,6 +27,23 @@ Acciones de deploy configuradas en Plesk Git:
 **Importante**: hay que usar la ruta completa a PHP 8.4. El `php` por defecto del sistema es 8.3 y
 da error.
 
+### Cuidado con `db:seed --force`
+
+Se ejecuta **en cada push, contra la base de datos de producción**. Todo lo que esté en
+`DatabaseSeeder` tiene que ser seguro de repetir indefinidamente y no puede pisar datos reales.
+
+Hoy solo crea el usuario admin **si no existe**, y nada más. Si vuelve a hacer falta añadir algo
+ahí, que sea siempre con esa forma: comprobar antes, no sobrescribir.
+
+Lo que **no** puede ir en ese seeder: contraseñas fijas escritas en el código (un `updateOrCreate`
+con el campo `password` devuelve la contraseña a su valor original en cada despliegue) ni datos de
+ejemplo. Los datos de demostración viven en `PortalDemoSeeder`, que se ejecuta a mano y se niega a
+correr en producción:
+
+```bash
+php artisan db:seed --class=Database\\Seeders\\PortalDemoSeeder
+```
+
 Pendiente de añadir a esas acciones: `php artisan storage:link` (hoy no hace falta porque el logo
 del cliente se sirve por la ruta `/media/logo/{cliente}`, pero lo hará en cuanto se usen otras URLs
 de `public`).

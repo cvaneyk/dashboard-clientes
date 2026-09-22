@@ -14,7 +14,12 @@ use Illuminate\Support\Facades\Hash;
 
 /**
  * Datos piloto: Clínica Universitaria La Salle · Meta · junio 2026.
- * Sirve para ver el dashboard funcionando de punta a punta.
+ * Sirve para ver el dashboard funcionando de punta a punta EN LOCAL.
+ *
+ * SOLO PARA DESARROLLO. No se llama desde DatabaseSeeder a propósito: el deploy
+ * ejecuta `db:seed --force` en cada push y esto metía un cliente inventado, con
+ * su usuario y una contraseña conocida, en la base de datos de producción.
+ * Por eso se niega a ejecutarse si el entorno es de producción.
  *
  * Ejecutar:  php artisan db:seed --class=Database\\Seeders\\PortalDemoSeeder
  *
@@ -24,6 +29,12 @@ class PortalDemoSeeder extends Seeder
 {
     public function run(): void
     {
+        if (app()->isProduction()) {
+            $this->command?->error('PortalDemoSeeder no se ejecuta en producción: son datos inventados.');
+
+            return;
+        }
+
         // --- Cliente + usuario de acceso ---
         $cliente = Cliente::updateOrCreate(
             ['slug' => 'la-salle'],
