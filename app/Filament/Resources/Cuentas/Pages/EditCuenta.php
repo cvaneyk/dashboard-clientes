@@ -50,7 +50,7 @@ class EditCuenta extends EditRecord
                 ->label(fn () => $this->etiquetaEstado())
                 ->icon(fn () => $this->getRecord()->conexionApi?->ultimo_error
                     ? 'heroicon-o-exclamation-triangle'
-                    : 'heroicon-o-plug')
+                    : 'heroicon-o-bolt')
                 ->color(fn () => $this->getRecord()->conexionApi
                     ? ($this->getRecord()->conexionApi->ultimo_error ? 'danger' : 'success')
                     : 'gray')

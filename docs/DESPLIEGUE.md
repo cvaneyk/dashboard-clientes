@@ -48,6 +48,23 @@ Pendiente de añadir a esas acciones: `php artisan storage:link` (hoy no hace fa
 del cliente se sirve por la ruta `/media/logo/{cliente}`, pero lo hará en cuanto se usen otras URLs
 de `public`).
 
+## Cron del scheduler (sincronización diaria por API)
+
+La sincronización automática con las APIs (`portal:sync`, 07:30 hora española) la dispara el
+scheduler de Laravel, pero en el VPS **hay que crear el cron una vez a mano** en
+Plesk → *Scheduled Tasks* (tarea del tipo "Ejecutar un comando PHP" o cron del sistema):
+
+```bash
+cd /var/www/vhosts/olimedia.es/clientes.olimedia.es && /opt/plesk/php/8.4/bin/php artisan schedule:run
+```
+
+Cada minuto (`* * * * *`); el propio scheduler decide cuándo toca ejecutar. Sin este cron, la
+sincronización solo va a mano: botón "Sincronizar ahora" en la ficha de la cuenta o
+`php artisan portal:sync`.
+
+Variables del `.env` del servidor para la conexión OAuth de Meta:
+`META_APP_ID` y `META_APP_SECRET` (ver CLAUDE.md §6b).
+
 ## Configuración del servidor
 
 - Docroot del subdominio `clientes.olimedia.es` → carpeta `public/` de Laravel.

@@ -96,18 +96,25 @@ app/
     GoogleParser.php                ← CSV UTF-16 + tabuladores, números ES, "Conversiones" opcional
     TikTokParser.php                ← Excel, salta "Total of N results"
     CampaignImporter.php            ← firstOrCreate de Línea + upsert métricas + import_log
+  Services/Sync/
+    MetaConnector.php               ← Marketing API de Meta → importRows() (sección 6b)
   Console/Commands/PortalImport.php ← php artisan portal:import {cuenta_id} {ruta}
+  Console/Commands/PortalSync.php   ← php artisan portal:sync {--cuenta=} {--dias=3}
   Http/Controllers/
     DashboardController.php         ← exporta el dataset diario completo a JSON
     Auth/LoginController.php        ← login cliente; admin → /admin
     AccountController.php           ← /cuenta, cambio de contraseña del cliente
+    Conexiones/MetaConexionController.php ← OAuth de Meta (autorizar + callback)
   Filament/Resources/               ← Clientes, Cuentas, Lineas, PresupuestoEventos,
                                       MetricaDiarias, ImportLogs, Users
   Models/                           ← Cliente, Cuenta, Linea, PresupuestoEvento,
-                                      MetricaDiaria, Override, ImportLog, User
+                                      MetricaDiaria, Override, ImportLog, User, ConexionApi
 resources/views/portal/             ← dashboard.blade.php, login.blade.php, cuenta.blade.php
-routes/web.php                      ← /login, /dashboard, /cuenta, /media/logo/{cliente}
+routes/web.php                      ← /login, /dashboard, /cuenta, /media/logo/{cliente},
+                                      /conexiones/meta/{autorizar,callback}
+routes/console.php                  ← portal:sync diario a las 07:30 (Europe/Madrid)
 database/migrations/2026_08_11_*    ← tablas del portal + cliente_id/es_admin en users
+database/migrations/2026_09_23_*    ← conexiones_api (tokens de API por cuenta)
 ```
 
 **Nota**: `Override` tiene modelo y lo aplica el motor, pero **no tiene recurso Filament**; hoy
@@ -128,6 +135,9 @@ hay que crear `app/Filament/Resources/Overrides/`.
   en cualquier motor que no trunque como la columna DATE de MySQL.
 - `overrides` — ajustes manuales.
 - `import_logs` — auditoría de importaciones, con `origen` (`manual|api`) y `filas_error`.
+- `conexiones_api` — credenciales de API **por cuenta** (1:1 con `cuentas`). `metodo`
+  (`system_user|oauth`), `access_token` **cifrado** (cast `encrypted`), `expires_at`,
+  `ultima_sincronizacion`, `ultimo_error`.
 - `users` — + `cliente_id`, `es_admin`.
 
 ---
@@ -178,6 +188,38 @@ interno ya está resuelto.
 
 ---
 
+## 6b. Sincronización por API: Meta (implementado); Google y TikTok (pendiente)
+
+[MetaConnector](app/Services/Sync/MetaConnector.php) baja insights de campaña día a día de la
+Marketing API de Meta y los vuelca en `importRows()`. Por eso API e informe manual son
+intercambiables e idempotentes entre sí (mismo upsert, mismo `import_logs`, `gasto_real` sigue
+siendo interno). El scheduler lo lanza a diario a las 07:30 (`Europe/Madrid`,
+[routes/console.php](routes/console.php)) y re-baja 3 días porque las plataformas corrigen cifras
+hacia atrás.
+
+**Autenticación por cuenta, a elegir en la ficha de la Cuenta de `/admin`** (no hay una global):
+
+- `system_user` — token de System User del Business Manager de OliMedia, pegado a mano. No
+  caduca; para las cuentas que gestiona la agencia. No necesita app de Facebook configurada.
+- `oauth` — cada cliente conecta su propio acceso con Facebook Login. Rutas
+  `/conexiones/meta/{autorizar,callback}` (guard `admin`); el `cuenta_id` viaja en la sesión
+  dentro del `state` (nonce anti-CSRF). El token de vida larga (~60 días) se renueva solo al
+  canjearlo cuando quedan <7 días. Requiere `META_APP_ID`/`META_APP_SECRET` en `.env` y el
+  redirect `{APP_URL}/conexiones/meta/callback` en "Valid OAuth Redirect URIs" de la app.
+
+En ambas modalidades la Cuenta necesita su `external_id` rellenado (acepta con o sin `act_`).
+El token va cifrado en `conexiones_api` (cast `encrypted`); los errores de sincronización quedan
+en `conexiones_api.ultimo_error` y se ven en el badge/modal de la ficha. Al crear un conector de
+otra plataforma (Google, TikTok), copia este patrón: reutiliza `conexiones_api`, que su método
+devuelva filas normalizadas y llame a `importRows()`; solo MetaConnector conoce Graph.
+
+Comandos: `php artisan portal:sync` (todas las Meta conectadas), `--cuenta=ID`, `--dias=7`.
+El cron de Plesk que mueve el scheduler está documentado en docs/DESPLIEGUE.md. El botón
+"Sincronizar ahora" vive en la ficha de la Cuenta; "Desconectar API" borra el token (los datos
+importados se conservan).
+
+---
+
 ## 7. Dashboard del cliente
 
 [resources/views/portal/dashboard.blade.php](resources/views/portal/dashboard.blade.php) +
@@ -219,6 +261,7 @@ Comandos útiles:
 
 ```bash
 php artisan portal:import 3 "storage/app/informes/meta-julio.xlsx"
+php artisan portal:sync              # sincroniza las cuentas Meta conectadas por API
 php artisan migrate --force
 php artisan optimize:clear     # obligatorio tras tocar config/ en producción
 composer test
