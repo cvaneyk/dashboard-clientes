@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Cuenta extends Model
 {
@@ -14,4 +15,5 @@ class Cuenta extends Model
 
     public function cliente(): BelongsTo { return $this->belongsTo(Cliente::class); }
     public function lineas(): HasMany { return $this->hasMany(Linea::class); }
+    public function conexionApi(): HasOne { return $this->hasOne(ConexionApi::class); }
 }

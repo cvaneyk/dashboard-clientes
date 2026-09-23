@@ -25,6 +25,15 @@ class CuentasTable
                 TextColumn::make('nombre_cuenta')
                     ->label('Cuenta')
                     ->searchable(),
+                TextColumn::make('conexionApi.metodo')
+                    ->label('Datos')
+                    ->badge()
+                    ->formatStateUsing(fn (?string $state) => match ($state) {
+                        'oauth'       => 'API · OAuth',
+                        'system_user' => 'API · Token',
+                        default       => 'Manual',
+                    })
+                    ->color(fn (?string $state) => $state ? 'success' : 'gray'),
                 IconColumn::make('activo')
                     ->label('Activa')
                     ->boolean(),

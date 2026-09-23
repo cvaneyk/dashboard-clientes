@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AccountController;
 use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\Conexiones\MetaConexionController;
 use App\Http\Controllers\DashboardController;
 use App\Models\Cliente;
 use Illuminate\Support\Facades\Auth;
@@ -36,4 +37,14 @@ Route::middleware('auth')->group(function () {
     // Mi cuenta (cambio de contraseña del cliente).
     Route::get('/cuenta', [AccountController::class, 'edit'])->name('portal.cuenta');
     Route::post('/cuenta', [AccountController::class, 'update'])->name('portal.cuenta.update');
+});
+
+// Conexión OAuth de la API de Meta: la lanza el admin desde la ficha de una
+// Cuenta y Facebook vuelve al callback. Guard 'admin' porque la sesión de la
+// conexión viaja con el admin que la inicia.
+Route::middleware('auth:admin')->group(function () {
+    Route::get('/conexiones/meta/autorizar', [MetaConexionController::class, 'autorizar'])
+        ->name('conexiones.meta.autorizar');
+    Route::get('/conexiones/meta/callback', [MetaConexionController::class, 'callback'])
+        ->name('conexiones.meta.callback');
 });

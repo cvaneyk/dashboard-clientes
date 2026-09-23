@@ -18,6 +18,19 @@ return [
         'key' => env('POSTMARK_API_KEY'),
     ],
 
+    /*
+    | Meta (Facebook) Marketing API. App en developers.facebook.com con el
+    | producto "Marketing API". Solo hace falta configurarla para el método
+    | OAuth; el token de System User se pega por cuenta desde /admin.
+    | En la app, "Valid OAuth Redirect URIs" debe incluir:
+    |   {APP_URL}/conexiones/meta/callback
+    */
+    'meta' => [
+        'app_id'      => env('META_APP_ID'),
+        'app_secret'  => env('META_APP_SECRET'),
+        'api_version' => env('META_API_VERSION', 'v23.0'),
+    ],
+
     'resend' => [
         'key' => env('RESEND_API_KEY'),
     ],
