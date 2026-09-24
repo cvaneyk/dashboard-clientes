@@ -16,16 +16,24 @@ use Throwable;
  *   php artisan portal:sync                    → todas las cuentas Meta conectadas
  *   php artisan portal:sync --cuenta=3         → solo esa cuenta
  *   php artisan portal:sync --dias=7           → ventana más ancha (correcciones)
+ *   php artisan portal:sync --cuenta=3 --desde=2026-04-01 --hasta=2026-07-31
+ *                                              → recuperar histórico de un periodo
  */
 class PortalSync extends Command
 {
-    protected $signature = 'portal:sync {--cuenta= : ID de una cuenta concreta} {--dias=3 : Días hacia atrás a sincronizar}';
+    protected $signature = 'portal:sync
+        {--cuenta= : ID de una cuenta concreta}
+        {--dias=3 : Días hacia atrás a sincronizar}
+        {--desde= : Fecha inicial AAAA-MM-DD (ignora --dias)}
+        {--hasta= : Fecha final AAAA-MM-DD (por defecto, hoy)}';
 
     protected $description = 'Sincroniza por API (Meta) las cuentas conectadas y las importa';
 
     public function handle(): int
     {
-        $dias = max(1, (int) $this->option('dias'));
+        $dias  = max(1, (int) $this->option('dias'));
+        $desde = $this->option('desde');
+        $hasta = $this->option('hasta');
 
         $cuentas = Cuenta::query()
             ->where('activo', true)
@@ -46,7 +54,11 @@ class PortalSync extends Command
             $this->line("→ {$cuenta->cliente?->nombre} · {$cuenta->nombre_cuenta}…");
 
             try {
-                $res = app(MetaConnector::class)->sincronizar($cuenta, $dias);
+                $conector = app(MetaConnector::class);
+
+                $res = ($desde || $hasta)
+                    ? $conector->sincronizarRango($cuenta, $desde ?? $hasta, $hasta ?? now()->toDateString())
+                    : $conector->sincronizar($cuenta, $dias);
 
                 $this->info(sprintf(
                     '   %d filas · %d líneas nuevas · %.2f € · %s → %s%s',

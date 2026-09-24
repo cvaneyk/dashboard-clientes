@@ -7,6 +7,7 @@ use App\Models\ConexionApi;
 use App\Services\Sync\MetaConnector;
 use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
+use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
@@ -103,7 +104,19 @@ class EditCuenta extends EditRecord
             Action::make('sincronizarAhora')
                 ->label('Sincronizar ahora')
                 ->icon('heroicon-o-arrow-path')
-                ->action(fn () => $this->sincronizar())
+                ->modalHeading('Sincronizar datos de Meta')
+                ->modalDescription('Sin fechas trae los últimos 3 días. Indica un rango para recuperar histórico o rehacer un periodo: volver a bajar días ya importados los sobrescribe, no los duplica.')
+                ->modalSubmitActionLabel('Sincronizar')
+                ->schema([
+                    DatePicker::make('desde')
+                        ->label('Desde (opcional)')
+                        ->maxDate(now()),
+                    DatePicker::make('hasta')
+                        ->label('Hasta (opcional)')
+                        ->maxDate(now())
+                        ->helperText('Vacío = hoy. Rangos largos tardan y pueden topar con el límite de peticiones de Meta.'),
+                ])
+                ->action(fn (array $data) => $this->sincronizar($data['desde'] ?? null, $data['hasta'] ?? null))
                 ->visible(fn () => $soloMeta() && $this->getRecord()->conexionApi()->exists()),
 
             Action::make('desconectarApi')
@@ -121,10 +134,20 @@ class EditCuenta extends EditRecord
         ];
     }
 
-    private function sincronizar(): void
+    private function sincronizar(?string $desde = null, ?string $hasta = null): void
     {
         try {
-            $res = app(MetaConnector::class)->sincronizar($this->getRecord());
+            $conector = app(MetaConnector::class);
+
+            // Si se indica solo una de las dos fechas, la otra se completa:
+            // "desde" suelto llega hasta hoy; "hasta" suelto arranca ese mismo día.
+            $res = ($desde || $hasta)
+                ? $conector->sincronizarRango(
+                    $this->getRecord(),
+                    $desde ?? $hasta,
+                    $hasta ?? now()->toDateString()
+                )
+                : $conector->sincronizar($this->getRecord());
 
             Notification::make()
                 ->title('Sincronización completada')

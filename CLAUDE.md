@@ -131,6 +131,7 @@ hay que crear `app/Filament/Resources/Overrides/`.
 
 - `clientes` — cliente final (nombre, slug, logo, color, activo).
 - `cuentas` — cuenta publicitaria por plataforma (`meta|google|tiktok|linkedin`).
+  `tipos_conversion` (opcional) fija qué conversiones de Meta cuentan como lead en esa cuenta.
 - `lineas` — campaña/adset presupuestada; `match_key` normalizada, `nivel` (`campania|adset`).
   `presupuesto_plataforma` (+ `_tipo` `diario|total`, `_nivel` `campania|adsets`, `_actualizado_en`)
   es el tope en la plataforma, **referencia interna** que refresca la sincronización.
@@ -219,13 +220,29 @@ en `conexiones_api.ultimo_error` y se ven en el badge/modal de la ficha. Al crea
 otra plataforma (Google, TikTok), copia este patrón: reutiliza `conexiones_api`, que su método
 devuelva filas normalizadas y llame a `importRows()`; solo MetaConnector conoce Graph.
 
+**Qué cuenta como lead**: Meta devuelve en `actions` varios tipos de conversión a la vez y cada
+cuenta mide distinto (formularios de Lead Ads → `lead`; registros en web con píxel →
+`complete_registration`). `tiposConversion()` resuelve una **lista por prioridad** y se queda con
+el **primer tipo presente en cada fila, nunca la suma**: Meta devuelve a la vez el agregado y el
+específico del píxel, que son el mismo evento contado dos veces. La lista por defecto está en
+`config/services.php` (`services.meta.tipos_conversion`) y cada Cuenta puede sobrescribirla en su
+ficha (`cuentas.tipos_conversion`). Para ver qué devuelve una cuenta de verdad:
+`php artisan portal:meta-acciones {cuenta} --dias=30`.
+
 **Presupuestos**: la sincronización llama además a `refrescarPresupuestos()`, que anota en cada
 Línea el tope de gasto de su campaña en Meta. Lee `/campaigns` y, para las campañas sin CBO (cuyo
 presupuesto vive en los adsets), suma `/adsets` por campaña. Graph da los importes en céntimos.
 Va en su propio `try/catch`: si Meta falla ahí, las métricas ya están importadas y la
 sincronización no se tira por un dato de apoyo. **Nunca escribe en `presupuesto_eventos`.**
 
-Comandos: `php artisan portal:sync` (todas las Meta conectadas), `--cuenta=ID`, `--dias=7`.
+**Rango de fechas**: `sincronizar($cuenta, $dias)` hace la ventana móvil de siempre;
+`sincronizarRango($cuenta, $desde, $hasta)` baja un periodo concreto para recuperar histórico
+(fechas `Y-m-d`, se enderezan si vienen al revés y el final se recorta a hoy). Mismo upsert, así
+que rebajar días ya importados los sobrescribe. Está en el botón "Sincronizar ahora" (dos fechas
+opcionales) y en el comando (`--desde` / `--hasta`).
+
+Comandos: `php artisan portal:sync` (todas las Meta conectadas), `--cuenta=ID`, `--dias=7`,
+`--desde=2026-04-01 --hasta=2026-07-31`.
 El cron de Plesk que mueve el scheduler está documentado en docs/DESPLIEGUE.md. El botón
 "Sincronizar ahora" vive en la ficha de la Cuenta; "Desconectar API" borra el token (los datos
 importados se conservan).
@@ -276,6 +293,8 @@ Comandos útiles:
 ```bash
 php artisan portal:import 3 "storage/app/informes/meta-julio.xlsx"
 php artisan portal:sync              # sincroniza las cuentas Meta conectadas por API
+php artisan portal:sync --cuenta=3 --desde=2026-04-01 --hasta=2026-07-31   # recuperar histórico
+php artisan portal:meta-acciones 3   # qué conversiones devuelve Meta en esa cuenta
 php artisan migrate --force
 php artisan optimize:clear     # obligatorio tras tocar config/ en producción
 composer test

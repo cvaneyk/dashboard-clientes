@@ -29,6 +29,26 @@ return [
         'app_id'      => env('META_APP_ID'),
         'app_secret'  => env('META_APP_SECRET'),
         'api_version' => env('META_API_VERSION', 'v23.0'),
+
+        /*
+        | Qué cuenta como "lead" en el informe del cliente. Meta devuelve en
+        | 'actions' una lista de tipos de conversión, y cada cuenta mide de una
+        | forma: formularios de Lead Ads ('lead') o registros en la web con
+        | píxel ('complete_registration' y su variante de píxel).
+        |
+        | Es una LISTA POR PRIORIDAD, no una suma: se usa el primer tipo que
+        | aparezca en la fila. Sumarlos duplicaría, porque Meta devuelve a la
+        | vez el agregado ('complete_registration') y el específico del píxel.
+        |
+        | Cada Cuenta puede sobrescribir esto en su ficha de /admin.
+        */
+        'tipos_conversion' => array_values(array_filter(array_map(
+            'trim',
+            explode(',', (string) env(
+                'META_TIPOS_CONVERSION',
+                'lead,complete_registration,offsite_conversion.fb_pixel_complete_registration,onsite_conversion.lead_grouped'
+            ))
+        ))),
     ],
 
     'resend' => [

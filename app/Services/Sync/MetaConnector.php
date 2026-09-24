@@ -6,6 +6,7 @@ use App\Models\ConexionApi;
 use App\Models\Cuenta;
 use App\Models\Linea;
 use App\Services\Import\CampaignImporter;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
 use Throwable;
@@ -32,8 +33,24 @@ class MetaConnector
 {
     private const SCOPE = 'ads_read';
 
-    /** Tipos de acción que cuentan como lead (la columna "Registros completados" del informe). */
-    private const TIPOS_LEAD = ['lead'];
+    /**
+     * Tipos de acción que cuentan como lead en esta cuenta, por orden de
+     * prioridad. Se coge el PRIMERO que aparezca en la fila, nunca la suma:
+     * Meta devuelve a la vez el agregado ('complete_registration') y el
+     * específico del píxel ('offsite_conversion.fb_pixel_...'), que son el
+     * mismo evento contado dos veces.
+     *
+     * @return array<int,string>
+     */
+    public function tiposConversion(Cuenta $cuenta): array
+    {
+        $propios = array_values(array_filter(array_map(
+            'trim',
+            explode(',', (string) $cuenta->tipos_conversion)
+        )));
+
+        return $propios !== [] ? $propios : (array) config('services.meta.tipos_conversion');
+    }
 
     public function __construct(private CampaignImporter $importer)
     {
@@ -151,17 +168,34 @@ class MetaConnector
      */
     public function sincronizar(Cuenta $cuenta, int $dias = 3): array
     {
+        $dias = max(1, $dias);
+
+        return $this->sincronizarRango(
+            $cuenta,
+            now()->subDays($dias - 1)->toDateString(),
+            now()->toDateString()
+        );
+    }
+
+    /**
+     * Sincroniza un rango concreto de fechas (ambas inclusive), para recuperar
+     * histórico o rehacer un periodo suelto. Es idempotente igual que el resto:
+     * volver a bajar días ya importados los sobrescribe, no los duplica.
+     *
+     * @return array{filas:int,filas_error:int,lineas_nuevas:int,gasto_real:float,periodo_inicio:?string,periodo_fin:?string,import_id:int}
+     */
+    public function sincronizarRango(Cuenta $cuenta, string $desde, string $hasta): array
+    {
         $conexion = $cuenta->conexionApi;
 
         if (! $conexion) {
             throw new RuntimeException('Esta cuenta no tiene conexión con Meta. Conéctala desde su ficha en /admin.');
         }
 
+        [$desde, $hasta] = $this->rango($desde, $hasta);
+
         try {
             $this->renovarSiProcede($conexion);
-
-            $hasta = now()->toDateString();
-            $desde = now()->subDays($dias - 1)->toDateString();
 
             $filas = $this->filas($cuenta, $conexion, $desde, $hasta);
 
@@ -304,6 +338,38 @@ class MetaConnector
     }
 
     /**
+     * Valida el rango pedido y lo deja en Y-m-d ordenado. Meta no acepta fechas
+     * futuras en los insights, así que el final se recorta a hoy.
+     *
+     * @return array{0:string,1:string}
+     */
+    private function rango(string $desde, string $hasta): array
+    {
+        try {
+            $ini = CarbonImmutable::parse($desde)->startOfDay();
+            $fin = CarbonImmutable::parse($hasta)->startOfDay();
+        } catch (Throwable) {
+            throw new RuntimeException('Fechas no válidas: se esperan dos fechas en formato AAAA-MM-DD.');
+        }
+
+        if ($ini->gt($fin)) {
+            [$ini, $fin] = [$fin, $ini];
+        }
+
+        $hoy = CarbonImmutable::now()->startOfDay();
+
+        if ($fin->gt($hoy)) {
+            $fin = $hoy;
+        }
+
+        if ($ini->gt($hoy)) {
+            throw new RuntimeException('El rango empieza en el futuro: no hay datos que traer.');
+        }
+
+        return [$ini->toDateString(), $fin->toDateString()];
+    }
+
+    /**
      * Graph devuelve los importes en la unidad menor de la moneda de la cuenta
      * (céntimos en euros): "1500" son 15,00 €. Se asume una moneda con dos
      * decimales, que es el caso de todas las cuentas del portal.
@@ -375,7 +441,7 @@ class MetaConnector
             }
 
             foreach ($resp->json('data', []) as $fila) {
-                $out[] = $this->normalizar($fila);
+                $out[] = $this->normalizar($fila, $this->tiposConversion($cuenta));
             }
 
             $url = $resp->json('paging.next');
@@ -392,16 +458,9 @@ class MetaConnector
      * @param  array<string,mixed> $fila
      * @return array<string,mixed>
      */
-    private function normalizar(array $fila): array
+    private function normalizar(array $fila, array $tiposConversion): array
     {
         $nombre = trim((string) ($fila['campaign_name'] ?? ''));
-
-        $leads = 0;
-        foreach (($fila['actions'] ?? []) as $accion) {
-            if (in_array($accion['action_type'] ?? '', self::TIPOS_LEAD, true)) {
-                $leads += (float) ($accion['value'] ?? 0);
-            }
-        }
 
         return [
             'match_key'   => Linea::normalizar($nombre),
@@ -411,8 +470,36 @@ class MetaConnector
             'alcance'     => (int) ($fila['reach'] ?? 0),
             'clics'       => (int) ($fila['clicks'] ?? 0),
             'gasto_real'  => round((float) ($fila['spend'] ?? 0), 2), // en la moneda de la cuenta
-            'leads'       => $leads,
+            'leads'       => $this->leads($fila['actions'] ?? [], $tiposConversion),
         ];
+    }
+
+    /**
+     * Leads de una fila de insights: el valor del PRIMER tipo de la lista de
+     * prioridad que aparezca. Ver tiposConversion() para por qué no se suman.
+     *
+     * @param  array<int,array<string,mixed>>  $acciones
+     * @param  array<int,string>  $tipos
+     */
+    private function leads(array $acciones, array $tipos): float
+    {
+        $porTipo = [];
+
+        foreach ($acciones as $accion) {
+            $tipo = (string) ($accion['action_type'] ?? '');
+
+            if ($tipo !== '') {
+                $porTipo[$tipo] = (float) ($accion['value'] ?? 0);
+            }
+        }
+
+        foreach ($tipos as $tipo) {
+            if (isset($porTipo[$tipo])) {
+                return $porTipo[$tipo];
+            }
+        }
+
+        return 0.0;
     }
 
     /** El external_id tal como lo espera Graph: solo dígitos, sin "act_". */

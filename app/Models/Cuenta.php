@@ -10,7 +10,10 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 class Cuenta extends Model
 {
     protected $table = 'cuentas';
-    protected $fillable = ['cliente_id', 'plataforma', 'nombre_cuenta', 'external_id', 'activo'];
+    protected $fillable = [
+        'cliente_id', 'plataforma', 'nombre_cuenta', 'external_id',
+        'tipos_conversion', 'activo',
+    ];
     protected $casts = ['activo' => 'boolean'];
 
     public function cliente(): BelongsTo { return $this->belongsTo(Cliente::class); }
