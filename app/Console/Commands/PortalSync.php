@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Console\Commands\Concerns\MuestraCuentasMeta;
 use App\Models\Cuenta;
 use App\Services\Sync\MetaConnector;
 use Illuminate\Console\Command;
@@ -21,6 +22,8 @@ use Throwable;
  */
 class PortalSync extends Command
 {
+    use MuestraCuentasMeta;
+
     protected $signature = 'portal:sync
         {--cuenta= : ID de una cuenta concreta}
         {--dias=3 : Días hacia atrás a sincronizar}
@@ -44,7 +47,23 @@ class PortalSync extends Command
             ->get();
 
         if ($cuentas->isEmpty()) {
+            // Si han pedido una cuenta concreta, decir por qué se queda fuera;
+            // si no, es que sencillamente no hay ninguna conectada todavía.
+            if ($id = $this->option('cuenta')) {
+                $this->error(sprintf(
+                    'No se puede sincronizar la cuenta %s: %s.',
+                    $id,
+                    $this->motivoNoSincronizable(Cuenta::with('conexionApi')->find($id))
+                ));
+
+                $this->mostrarCuentasMeta();
+
+                return self::FAILURE;
+            }
+
             $this->info('No hay cuentas de Meta conectadas a la API (se conectan desde su ficha en /admin).');
+            $this->mostrarCuentasMeta();
+
             return self::SUCCESS;
         }
 

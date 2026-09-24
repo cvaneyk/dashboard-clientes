@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Console\Commands\Concerns\MuestraCuentasMeta;
 use App\Models\Cuenta;
 use App\Services\Sync\MetaConnector;
 use Illuminate\Console\Command;
@@ -21,6 +22,8 @@ use Illuminate\Support\Facades\Http;
  */
 class PortalMetaAcciones extends Command
 {
+    use MuestraCuentasMeta;
+
     protected $signature = 'portal:meta-acciones {cuenta : ID de la cuenta} {--dias=30 : Días hacia atrás a mirar}';
 
     protected $description = 'Lista los tipos de conversión que devuelve Meta para una cuenta (para configurar cuál cuenta como lead)';
@@ -29,14 +32,14 @@ class PortalMetaAcciones extends Command
     {
         $cuenta = Cuenta::with('conexionApi')->find($this->argument('cuenta'));
 
-        if (! $cuenta || $cuenta->plataforma !== 'meta') {
-            $this->error('No existe esa cuenta de Meta.');
+        if (! $cuenta || $cuenta->plataforma !== 'meta' || ! $cuenta->conexionApi) {
+            $this->error(sprintf(
+                'No se puede consultar la cuenta %s: %s.',
+                $this->argument('cuenta'),
+                $this->motivoNoSincronizable($cuenta)
+            ));
 
-            return self::FAILURE;
-        }
-
-        if (! $cuenta->conexionApi) {
-            $this->error('Esa cuenta no está conectada a la API. Conéctala desde su ficha en /admin.');
+            $this->mostrarCuentasMeta();
 
             return self::FAILURE;
         }
