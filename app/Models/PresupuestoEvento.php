@@ -10,7 +10,10 @@ class PresupuestoEvento extends Model
     protected $table = 'presupuesto_eventos';
     protected $fillable = ['linea_id', 'fecha_efectiva', 'objetivo_mes', 'estado', 'nota'];
     protected $casts = [
-        'fecha_efectiva' => 'date',
+        // 'date:Y-m-d' por el mismo motivo que en MetricaDiaria: con 'date' se
+        // guardaba 'Y-m-d H:i:s' y las búsquedas por fecha exacta (el alta
+        // masiva de objetivos) dejaban de casar fuera de MySQL.
+        'fecha_efectiva' => 'date:Y-m-d',
         'objetivo_mes'   => 'decimal:2',
     ];
 

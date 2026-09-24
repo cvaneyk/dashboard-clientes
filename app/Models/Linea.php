@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use Carbon\Carbon;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -13,14 +15,37 @@ class Linea extends Model
     protected $fillable = [
         'cliente_id', 'cuenta_id', 'plataforma', 'nombre',
         'producto', 'match_key', 'nivel', 'activo',
+        'presupuesto_plataforma', 'presupuesto_plataforma_tipo',
+        'presupuesto_plataforma_nivel', 'presupuesto_plataforma_actualizado_en',
     ];
-    protected $casts = ['activo' => 'boolean'];
+    protected $casts = [
+        'activo'                                => 'boolean',
+        'presupuesto_plataforma'                => 'decimal:2',
+        'presupuesto_plataforma_actualizado_en' => 'datetime',
+    ];
 
     public function cliente(): BelongsTo { return $this->belongsTo(Cliente::class); }
     public function cuenta(): BelongsTo { return $this->belongsTo(Cuenta::class); }
     public function presupuestoEventos(): HasMany { return $this->hasMany(PresupuestoEvento::class); }
     public function metricas(): HasMany { return $this->hasMany(MetricaDiaria::class); }
     public function overrides(): HasMany { return $this->hasMany(Override::class); }
+
+    /**
+     * Evento de presupuesto que rige en una fecha: el último con fecha_efectiva
+     * anterior o igual. Es el mismo criterio que aplica PricingEngine día a día.
+     * Devuelve null si la línea aún no tiene presupuesto asignado.
+     *
+     * Trabaja sobre la relación ya cargada, así que en listados conviene hacer
+     * ->with('presupuestoEventos') para no disparar una consulta por fila.
+     */
+    public function eventoVigente(?CarbonInterface $fecha = null): ?PresupuestoEvento
+    {
+        $fecha ??= Carbon::now();
+
+        return $this->presupuestoEventos
+            ->sortBy('fecha_efectiva')
+            ->last(fn (PresupuestoEvento $e) => $e->fecha_efectiva->lte($fecha));
+    }
 
     /** Normaliza un nombre de campaña/adset para emparejar (quita emojis y espacios). */
     public static function normalizar(string $nombre): string

@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Lineas\Schemas;
 
 use App\Models\Linea;
 use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -62,6 +63,27 @@ class LineaForm
                 Toggle::make('activo')
                     ->label('Activa')
                     ->default(true),
+
+                // Referencia interna: lo que esta campaña tiene topado en la
+                // plataforma. Ayuda a fijar el objetivo, pero no es el objetivo.
+                Placeholder::make('presupuesto_plataforma_ref')
+                    ->label('Tope en la plataforma (referencia interna)')
+                    ->content(function (?Linea $record): string {
+                        if (! $record?->presupuesto_plataforma) {
+                            return 'Sin dato. Se rellena solo al sincronizar por API.';
+                        }
+
+                        return sprintf(
+                            '%s € %s%s · actualizado el %s',
+                            number_format((float) $record->presupuesto_plataforma, 2, ',', '.'),
+                            $record->presupuesto_plataforma_tipo === 'diario' ? 'al día' : 'del periodo',
+                            $record->presupuesto_plataforma_nivel === 'adsets' ? ' (suma de sus adsets)' : '',
+                            $record->presupuesto_plataforma_actualizado_en?->format('d/m/Y H:i') ?? '?'
+                        );
+                    })
+                    ->helperText('Es el tope de gasto en Meta, no lo que se factura al cliente. Nunca se muestra en el dashboard.')
+                    ->visible(fn (?Linea $record) => $record !== null)
+                    ->columnSpanFull(),
 
                 Repeater::make('presupuestoEventos')
                     ->relationship()

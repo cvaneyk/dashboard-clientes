@@ -32,6 +32,10 @@ Reglas derivadas, **no romper ninguna**:
   último evento vigente. Nunca edites "el presupuesto" en sitio: añade un evento.
 - `gasto_real` (lo que se paga a la plataforma) es **solo uso interno / margen**.
   **Nunca debe aparecer en ninguna vista del cliente.**
+- `lineas.presupuesto_plataforma` (el tope de gasto de la campaña en Meta, que trae la API) es de
+  esa misma familia: **referencia interna para el account manager, solo visible en `/admin`**.
+  No es el objetivo facturable y **no puede convertirse en uno automáticamente**: el objetivo lo
+  decide OliMedia porque lleva el margen dentro. Ninguna API conoce esa cifra.
 - CPC cliente = `coste_cliente / clics_reales`; CPL cliente = `coste_cliente / leads_reales`.
 - `App\Models\Override` permite ajustes manuales del account manager sobre `coste_cliente`
   (por día concreto, o del mes completo redistribuyendo proporcionalmente).
@@ -128,6 +132,8 @@ hay que crear `app/Filament/Resources/Overrides/`.
 - `clientes` — cliente final (nombre, slug, logo, color, activo).
 - `cuentas` — cuenta publicitaria por plataforma (`meta|google|tiktok|linkedin`).
 - `lineas` — campaña/adset presupuestada; `match_key` normalizada, `nivel` (`campania|adset`).
+  `presupuesto_plataforma` (+ `_tipo` `diario|total`, `_nivel` `campania|adsets`, `_actualizado_en`)
+  es el tope en la plataforma, **referencia interna** que refresca la sincronización.
 - `presupuesto_eventos` — línea temporal del objetivo mensual (la flexibilidad vive aquí).
 - `metricas_diarias` — cifras **reales** por día y línea. **Único por `(cuenta_id, match_key, fecha)`**
   → es lo que permite el upsert idempotente. Guarda `import_id`. El cast de `fecha` es
@@ -213,6 +219,12 @@ en `conexiones_api.ultimo_error` y se ven en el badge/modal de la ficha. Al crea
 otra plataforma (Google, TikTok), copia este patrón: reutiliza `conexiones_api`, que su método
 devuelva filas normalizadas y llame a `importRows()`; solo MetaConnector conoce Graph.
 
+**Presupuestos**: la sincronización llama además a `refrescarPresupuestos()`, que anota en cada
+Línea el tope de gasto de su campaña en Meta. Lee `/campaigns` y, para las campañas sin CBO (cuyo
+presupuesto vive en los adsets), suma `/adsets` por campaña. Graph da los importes en céntimos.
+Va en su propio `try/catch`: si Meta falla ahí, las métricas ya están importadas y la
+sincronización no se tira por un dato de apoyo. **Nunca escribe en `presupuesto_eventos`.**
+
 Comandos: `php artisan portal:sync` (todas las Meta conectadas), `--cuenta=ID`, `--dias=7`.
 El cron de Plesk que mueve el scheduler está documentado en docs/DESPLIEGUE.md. El botón
 "Sincronizar ahora" vive en la ficha de la Cuenta; "Desconectar API" borra el token (los datos
@@ -238,7 +250,9 @@ con logos SVG inline, tabla de campañas con borde de color por canal, export CS
   **para no depender de `storage:link`**. Si añades otras imágenes subidas, sigue este patrón o
   asegúrate primero del symlink.
 - **Una línea sin presupuesto del mes muestra inversión/CPC/CPL a 0.** Clics, leads e impresiones
-  reales sí se ven. No es un bug: falta el evento de presupuesto en la ficha de la Línea.
+  reales sí se ven. No es un bug: falta el evento de presupuesto en la ficha de la Línea. Como la
+  sincronización crea líneas solas, en `/admin → Líneas` hay columna "Objetivo cliente", filtro
+  "Solo las que no tienen presupuesto" y acción masiva "Asignar objetivo del mes" para cazarlas.
 
 ---
 

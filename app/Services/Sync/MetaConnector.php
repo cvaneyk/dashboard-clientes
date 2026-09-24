@@ -171,6 +171,15 @@ class MetaConnector
                 'user_id' => null,
             ]);
 
+            // El presupuesto de plataforma es un extra de referencia para el
+            // panel: si Meta falla aquí, la sincronización de métricas ya está
+            // hecha y no se tira por esto.
+            try {
+                $this->refrescarPresupuestos($cuenta, $conexion);
+            } catch (Throwable $e) {
+                report($e);
+            }
+
             $conexion->forceFill([
                 'ultima_sincronizacion' => now(),
                 'ultimo_error'          => null,
@@ -183,6 +192,158 @@ class MetaConnector
             $conexion->forceFill(['ultimo_error' => mb_substr($e->getMessage(), 0, 500)])->save();
             throw $e;
         }
+    }
+
+    /**
+     * Guarda en cada Línea el presupuesto que tiene su campaña EN META, como
+     * dato interno de referencia para el account manager.
+     *
+     * NO es el presupuesto del portal: el que se factura al cliente sigue
+     * siendo presupuesto_eventos.objetivo_mes, que se decide a mano y lleva
+     * margen. Esta cifra es de la familia de gasto_real (uso interno) y no
+     * entra en el motor de precios ni se enseña al cliente.
+     *
+     * En Meta el presupuesto puede estar en dos sitios:
+     *   - CBO: en la propia campaña.
+     *   - Sin CBO: en cada adset; entonces se suman los de la campaña.
+     * Y puede ser diario ('diario') o de todo el periodo ('total'), que no son
+     * comparables entre sí: por eso se guarda también de qué tipo es.
+     *
+     * @return int Líneas actualizadas.
+     */
+    public function refrescarPresupuestos(Cuenta $cuenta, ConexionApi $conexion): int
+    {
+        $acto = 'act_' . $this->cuentaExternaId($cuenta);
+
+        $campañas = $this->paginar(
+            $this->url($acto . '/campaigns', [
+                'fields' => 'id,name,daily_budget,lifetime_budget',
+                'limit'  => 500,
+            ]),
+            $conexion->access_token
+        );
+
+        // Presupuesto propio de la campaña (CBO).
+        $presupuestos = [];   // campaign_id => [importe, tipo, nivel, nombre]
+        foreach ($campañas as $c) {
+            $id     = (string) ($c['id'] ?? '');
+            $diario = $this->importe($c['daily_budget'] ?? null);
+            $total  = $this->importe($c['lifetime_budget'] ?? null);
+
+            $presupuestos[$id] = [
+                'nombre'  => (string) ($c['name'] ?? ''),
+                'importe' => $diario ?? $total,
+                'tipo'    => $diario !== null ? 'diario' : ($total !== null ? 'total' : null),
+                'nivel'   => 'campania',
+            ];
+        }
+
+        // Para las campañas sin presupuesto propio, se suma el de sus adsets.
+        $faltan = array_filter($presupuestos, fn ($p) => $p['importe'] === null);
+
+        if ($faltan !== []) {
+            $adsets = $this->paginar(
+                $this->url($acto . '/adsets', [
+                    'fields' => 'campaign_id,daily_budget,lifetime_budget',
+                    'limit'  => 500,
+                ]),
+                $conexion->access_token
+            );
+
+            foreach ($adsets as $a) {
+                $campaña = (string) ($a['campaign_id'] ?? '');
+
+                if (! isset($faltan[$campaña])) {
+                    continue;
+                }
+
+                $diario = $this->importe($a['daily_budget'] ?? null);
+                $total  = $this->importe($a['lifetime_budget'] ?? null);
+                $tipo   = $diario !== null ? 'diario' : ($total !== null ? 'total' : null);
+
+                if ($tipo === null) {
+                    continue;
+                }
+
+                $acumulado = $presupuestos[$campaña];
+
+                $presupuestos[$campaña] = [
+                    'nombre'  => $acumulado['nombre'],
+                    'importe' => round((float) $acumulado['importe'] + ($diario ?? $total), 2),
+                    // Si una campaña mezcla adsets diarios y de periodo, la suma
+                    // no significaría nada: se marca con el primero y el panel
+                    // avisa de que es una suma de adsets.
+                    'tipo'    => $acumulado['tipo'] ?? $tipo,
+                    'nivel'   => 'adsets',
+                ];
+            }
+        }
+
+        // Las líneas se emparejan por la misma clave normalizada que las métricas.
+        $lineas = $cuenta->lineas()->get()->keyBy('match_key');
+        $tocadas = 0;
+
+        foreach ($presupuestos as $p) {
+            $linea = $lineas->get(Linea::normalizar($p['nombre']));
+
+            if (! $linea || $p['importe'] === null) {
+                continue;
+            }
+
+            $linea->forceFill([
+                'presupuesto_plataforma'                => $p['importe'],
+                'presupuesto_plataforma_tipo'           => $p['tipo'],
+                'presupuesto_plataforma_nivel'          => $p['nivel'],
+                'presupuesto_plataforma_actualizado_en' => now(),
+            ])->save();
+
+            $tocadas++;
+        }
+
+        return $tocadas;
+    }
+
+    /**
+     * Graph devuelve los importes en la unidad menor de la moneda de la cuenta
+     * (céntimos en euros): "1500" son 15,00 €. Se asume una moneda con dos
+     * decimales, que es el caso de todas las cuentas del portal.
+     */
+    private function importe(mixed $valor): ?float
+    {
+        if ($valor === null || $valor === '' || ! is_numeric($valor)) {
+            return null;
+        }
+
+        $importe = round(((float) $valor) / 100, 2);
+
+        return $importe > 0 ? $importe : null;
+    }
+
+    /**
+     * Recorre un listado de Graph siguiendo paginación y devuelve todos los
+     * elementos de 'data'.
+     *
+     * @return array<int,array<string,mixed>>
+     */
+    private function paginar(string $url, string $token): array
+    {
+        $out = [];
+
+        while ($url) {
+            $resp = Http::withToken($token)->timeout(60)->retry(2, 500, throw: false)->get($url);
+
+            if ($resp->failed()) {
+                throw new RuntimeException('Meta: ' . $this->mensajeError($resp->json(), $resp->body()));
+            }
+
+            foreach ($resp->json('data', []) as $fila) {
+                $out[] = $fila;
+            }
+
+            $url = $resp->json('paging.next');
+        }
+
+        return $out;
     }
 
     /**
