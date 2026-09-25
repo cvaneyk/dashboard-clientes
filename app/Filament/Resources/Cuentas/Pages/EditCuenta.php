@@ -4,7 +4,8 @@ namespace App\Filament\Resources\Cuentas\Pages;
 
 use App\Filament\Resources\Cuentas\CuentaResource;
 use App\Models\ConexionApi;
-use App\Services\Sync\MetaConnector;
+use App\Services\Sync\Conectores;
+use App\Services\Sync\GoogleAdsConnector;
 use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
 use Filament\Forms\Components\DatePicker;
@@ -41,7 +42,9 @@ class EditCuenta extends EditRecord
 
     protected function getHeaderActions(): array
     {
-        $soloMeta = fn () => $this->getRecord()->plataforma === 'meta';
+        $soloMeta   = fn () => $this->getRecord()->plataforma === 'meta';
+        $soloGoogle = fn () => $this->getRecord()->plataforma === 'google';
+        $conApi     = fn () => Conectores::soportada($this->getRecord()->plataforma);
 
         return [
             DeleteAction::make(),
@@ -55,11 +58,11 @@ class EditCuenta extends EditRecord
                 ->color(fn () => $this->getRecord()->conexionApi
                     ? ($this->getRecord()->conexionApi->ultimo_error ? 'danger' : 'success')
                     : 'gray')
-                ->modalHeading('Conexión con la API de Meta')
+                ->modalHeading(fn () => 'Conexión con la API de ' . Conectores::nombre($this->getRecord()->plataforma))
                 ->modalSubmitAction(false)
                 ->modalCancelActionLabel('Cerrar')
                 ->schema(fn () => $this->detallesEstado())
-                ->visible($soloMeta),
+                ->visible($conApi),
 
             // Método A: el cliente conecta su propia cuenta (Facebook Login).
             Action::make('conectarOauth')
@@ -101,6 +104,59 @@ class EditCuenta extends EditRecord
                 })
                 ->visible($soloMeta),
 
+            // Google · método A: el cliente autoriza su propia cuenta.
+            Action::make('conectarGoogleOauth')
+                ->label(fn () => $this->getRecord()->conexionApi?->metodo === 'oauth'
+                    ? 'Reconectar (cuenta del cliente)'
+                    : 'Conectar con la cuenta del cliente')
+                ->icon('heroicon-o-link')
+                ->url(fn () => route('conexiones.google.autorizar', ['cuenta' => $this->getRecord()->id]))
+                ->visible($soloGoogle),
+
+            // Google · método B: refresh token de la MCC de OliMedia. Uno solo
+            // vale para todas las cuentas que cuelgan de ella.
+            Action::make('conectarGoogleMcc')
+                ->label(fn () => ($this->getRecord()->conexionApi?->metodo === 'mcc')
+                    ? 'Renovar refresh token de la MCC'
+                    : 'Conectar con la MCC de OliMedia')
+                ->icon('heroicon-o-key')
+                ->modalHeading('Refresh token de Google Ads')
+                ->modalDescription('Para las cuentas que cuelgan de vuestra cuenta de administrador (MCC). El mismo refresh token sirve para todos esos clientes: lo que cambia es el customer ID de cada Cuenta.')
+                ->modalSubmitActionLabel('Guardar y comprobar')
+                ->schema([
+                    TextInput::make('refresh_token')
+                        ->label('Refresh token')
+                        ->password()
+                        ->revealable()
+                        ->required(),
+                    TextInput::make('login_customer_id')
+                        ->label('ID de la MCC (opcional)')
+                        ->helperText('Solo si es distinto del configurado en el servidor. Con o sin guiones.'),
+                ])
+                ->action(function (array $data): void {
+                    try {
+                        app(GoogleAdsConnector::class)->guardarRefreshToken(
+                            $this->getRecord(),
+                            $data['refresh_token'],
+                            $data['login_customer_id'] ?? null
+                        );
+
+                        Notification::make()->title('Cuenta conectada con Google Ads')->success()->send();
+                    } catch (Throwable $e) {
+                        // Si el token no lee nada, la conexión no vale: se borra
+                        // para no dejar una cuenta "conectada" que falla de noche.
+                        $this->getRecord()->conexionApi()->delete();
+
+                        Notification::make()
+                            ->title('No se pudo conectar')
+                            ->body($e->getMessage())
+                            ->danger()
+                            ->persistent()
+                            ->send();
+                    }
+                })
+                ->visible($soloGoogle),
+
             Action::make('sincronizarAhora')
                 ->label('Sincronizar ahora')
                 ->icon('heroicon-o-arrow-path')
@@ -117,7 +173,7 @@ class EditCuenta extends EditRecord
                         ->helperText('Vacío = hoy. Rangos largos tardan y pueden topar con el límite de peticiones de Meta.'),
                 ])
                 ->action(fn (array $data) => $this->sincronizar($data['desde'] ?? null, $data['hasta'] ?? null))
-                ->visible(fn () => $soloMeta() && $this->getRecord()->conexionApi()->exists()),
+                ->visible(fn () => $conApi() && $this->getRecord()->conexionApi()->exists()),
 
             Action::make('desconectarApi')
                 ->label('Desconectar API')
@@ -130,14 +186,14 @@ class EditCuenta extends EditRecord
 
                     Notification::make()->title('Conexión eliminada')->success()->send();
                 })
-                ->visible(fn () => $soloMeta() && $this->getRecord()->conexionApi()->exists()),
+                ->visible(fn () => $conApi() && $this->getRecord()->conexionApi()->exists()),
         ];
     }
 
     private function sincronizar(?string $desde = null, ?string $hasta = null): void
     {
         try {
-            $conector = app(MetaConnector::class);
+            $conector = Conectores::para($this->getRecord());
 
             // Si se indica solo una de las dos fechas, la otra se completa:
             // "desde" suelto llega hasta hoy; "hasta" suelto arranca ese mismo día.
@@ -181,11 +237,22 @@ class EditCuenta extends EditRecord
             return 'API: sin conectar';
         }
 
-        $metodo = $conexion->metodo === 'oauth' ? 'OAuth' : 'System User';
+        $plataforma = Conectores::nombre($this->getRecord()->plataforma);
+        $metodo     = $this->nombreMetodo($conexion->metodo);
 
         return $conexion->ultimo_error
-            ? "API Meta ({$metodo}): con error"
-            : "API Meta ({$metodo}): conectada";
+            ? "API {$plataforma} ({$metodo}): con error"
+            : "API {$plataforma} ({$metodo}): conectada";
+    }
+
+    private function nombreMetodo(?string $metodo): string
+    {
+        return match ($metodo) {
+            'oauth'       => 'cuenta del cliente',
+            'system_user' => 'System User',
+            'mcc'         => 'MCC',
+            default       => (string) $metodo,
+        };
     }
 
     /** @return array<int,Placeholder> */
@@ -196,9 +263,13 @@ class EditCuenta extends EditRecord
         if (! $conexion) {
             return [
                 Placeholder::make('ayuda')->content(
-                    'Conecta esta cuenta con "OAuth del cliente" (cada cliente con su propio acceso a la API) '
-                    . 'o con "token de System User" (cuentas gestionadas por OliMedia). Después, la sincronización '
-                    . 'diaria trae los datos sola.'
+                    $this->getRecord()->plataforma === 'google'
+                        ? 'Conecta esta cuenta con la MCC de OliMedia (un refresh token vale para todos los clientes '
+                            . 'que cuelgan de ella) o con la cuenta del propio cliente. Después, la sincronización '
+                            . 'diaria trae los datos sola.'
+                        : 'Conecta esta cuenta con "OAuth del cliente" (cada cliente con su propio acceso a la API) '
+                            . 'o con "token de System User" (cuentas gestionadas por OliMedia). Después, la '
+                            . 'sincronización diaria trae los datos sola.'
                 ),
             ];
         }
@@ -206,11 +277,16 @@ class EditCuenta extends EditRecord
         return [
             Placeholder::make('metodo')
                 ->label('Método')
-                ->content($conexion->metodo === 'oauth'
-                    ? 'OAuth del cliente (Facebook Login), token de vida larga que se renueva solo'
-                    : 'Token de System User (no caduca)'),
+                ->content(match ($conexion->metodo) {
+                    'oauth'       => 'Acceso del propio cliente; el token se renueva solo',
+                    'system_user' => 'Token de System User de OliMedia (no caduca)',
+                    'mcc'         => 'Refresh token de la MCC de OliMedia (no caduca)',
+                    default       => (string) $conexion->metodo,
+                }),
             Placeholder::make('caducidad')
-                ->label('El token caduca')
+                // En Google el access_token dura una hora y se renueva solo con
+                // el refresh token: esa fecha no es la vida de la conexión.
+                ->label($this->getRecord()->plataforma === 'google' ? 'Access token válido hasta' : 'El token caduca')
                 ->content($conexion->expires_at?->format('d/m/Y H:i') ?? 'Nunca'),
             Placeholder::make('ultima')
                 ->label('Última sincronización')

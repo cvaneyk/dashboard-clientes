@@ -2,19 +2,19 @@
 
 namespace App\Console\Commands;
 
-use App\Console\Commands\Concerns\MuestraCuentasMeta;
+use App\Console\Commands\Concerns\MuestraCuentasSincronizables;
 use App\Models\Cuenta;
-use App\Services\Sync\MetaConnector;
+use App\Services\Sync\Conectores;
 use Illuminate\Console\Command;
 use Throwable;
 
 /**
- * Sincroniza por API las cuentas conectadas (hoy: Meta) bajando los últimos
+ * Sincroniza por API las cuentas conectadas (Meta y Google Ads) bajando los últimos
  * días y dejándolos en el importador habitual. La ejecución diaria la programa
  * el scheduler (ver routes/console.php); a mano sirve para probar o re-sincronizar.
  *
  * Ejemplos:
- *   php artisan portal:sync                    → todas las cuentas Meta conectadas
+ *   php artisan portal:sync                    → todas las cuentas conectadas
  *   php artisan portal:sync --cuenta=3         → solo esa cuenta
  *   php artisan portal:sync --dias=7           → ventana más ancha (correcciones)
  *   php artisan portal:sync --cuenta=3 --desde=2026-04-01 --hasta=2026-07-31
@@ -22,7 +22,7 @@ use Throwable;
  */
 class PortalSync extends Command
 {
-    use MuestraCuentasMeta;
+    use MuestraCuentasSincronizables;
 
     protected $signature = 'portal:sync
         {--cuenta= : ID de una cuenta concreta}
@@ -30,7 +30,7 @@ class PortalSync extends Command
         {--desde= : Fecha inicial AAAA-MM-DD (ignora --dias)}
         {--hasta= : Fecha final AAAA-MM-DD (por defecto, hoy)}';
 
-    protected $description = 'Sincroniza por API (Meta) las cuentas conectadas y las importa';
+    protected $description = 'Sincroniza por API (Meta, Google Ads) las cuentas conectadas y las importa';
 
     public function handle(): int
     {
@@ -40,7 +40,7 @@ class PortalSync extends Command
 
         $cuentas = Cuenta::query()
             ->where('activo', true)
-            ->where('plataforma', 'meta')
+            ->whereIn('plataforma', Conectores::PLATAFORMAS)
             ->whereHas('conexionApi')
             ->when($this->option('cuenta'), fn ($q, $id) => $q->whereKey($id))
             ->with('cliente')
@@ -56,13 +56,13 @@ class PortalSync extends Command
                     $this->motivoNoSincronizable(Cuenta::with('conexionApi')->find($id))
                 ));
 
-                $this->mostrarCuentasMeta();
+                $this->mostrarCuentasSincronizables();
 
                 return self::FAILURE;
             }
 
-            $this->info('No hay cuentas de Meta conectadas a la API (se conectan desde su ficha en /admin).');
-            $this->mostrarCuentasMeta();
+            $this->info('No hay cuentas conectadas a la API (se conectan desde su ficha en /admin).');
+            $this->mostrarCuentasSincronizables();
 
             return self::SUCCESS;
         }
@@ -73,7 +73,7 @@ class PortalSync extends Command
             $this->line("→ {$cuenta->cliente?->nombre} · {$cuenta->nombre_cuenta}…");
 
             try {
-                $conector = app(MetaConnector::class);
+                $conector = Conectores::para($cuenta);
 
                 $res = ($desde || $hasta)
                     ? $conector->sincronizarRango($cuenta, $desde ?? $hasta, $hasta ?? now()->toDateString())

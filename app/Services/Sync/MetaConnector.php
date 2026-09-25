@@ -29,7 +29,7 @@ use Throwable;
  * La app de Facebook (META_APP_ID / META_APP_SECRET) solo es necesaria para
  * el método OAuth.
  */
-class MetaConnector
+class MetaConnector implements Conector
 {
     private const SCOPE = 'ads_read';
 

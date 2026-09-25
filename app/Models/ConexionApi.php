@@ -13,12 +13,13 @@ class ConexionApi extends Model
 {
     protected $table = 'conexiones_api';
     protected $fillable = [
-        'cuenta_id', 'metodo', 'access_token', 'expires_at',
-        'ultima_sincronizacion', 'ultimo_error',
+        'cuenta_id', 'metodo', 'access_token', 'refresh_token', 'login_customer_id',
+        'expires_at', 'ultima_sincronizacion', 'ultimo_error',
     ];
     protected $casts = [
-        'access_token'         => 'encrypted',
-        'expires_at'           => 'datetime',
+        'access_token'          => 'encrypted',
+        'refresh_token'         => 'encrypted',
+        'expires_at'            => 'datetime',
         'ultima_sincronizacion' => 'datetime',
     ];
 

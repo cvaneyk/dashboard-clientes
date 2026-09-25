@@ -53,12 +53,22 @@ class ComandosSyncTest extends TestCase
             ->assertFailed();
     }
 
-    public function test_sync_avisa_si_la_cuenta_es_de_otra_plataforma(): void
+    public function test_sync_avisa_si_la_plataforma_aun_no_tiene_conector(): void
+    {
+        $tiktok = $this->cuenta(['plataforma' => 'tiktok', 'nombre_cuenta' => 'Mi universidad · TikTok']);
+
+        $this->artisan('portal:sync', ['--cuenta' => $tiktok->id])
+            ->expectsOutputToContain('todavía no tiene conector')
+            ->assertFailed();
+    }
+
+    public function test_sync_ya_tiene_en_cuenta_las_cuentas_de_google(): void
     {
         $google = $this->cuenta(['plataforma' => 'google', 'nombre_cuenta' => 'Mi universidad · Google']);
 
+        // Sin conexión aún: el motivo debe ser ese, no "plataforma no soportada".
         $this->artisan('portal:sync', ['--cuenta' => $google->id])
-            ->expectsOutputToContain('es de google')
+            ->expectsOutputToContain('no tiene conexión con la API')
             ->assertFailed();
     }
 
@@ -84,7 +94,7 @@ class ComandosSyncTest extends TestCase
     public function test_sync_sin_cuentas_conectadas_no_falla_para_no_alarmar_al_cron(): void
     {
         $this->artisan('portal:sync')
-            ->expectsOutputToContain('No hay cuentas de Meta conectadas')
+            ->expectsOutputToContain('No hay cuentas conectadas')
             ->assertSuccessful();
     }
 

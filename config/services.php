@@ -51,6 +51,31 @@ return [
         ))),
     ],
 
+    /*
+    | Google Ads API. A diferencia de Meta, aquí hay TRES piezas de agencia que
+    | son comunes a todos los clientes y viven en el .env del servidor:
+    |
+    |   - developer_token: se pide desde la cuenta de administrador (MCC) y lo
+    |     aprueba Google. Es el mismo para toda la agencia.
+    |   - client_id / client_secret: credenciales OAuth de un proyecto de Google
+    |     Cloud con la Google Ads API habilitada. En "URIs de redirección
+    |     autorizados" debe estar {APP_URL}/conexiones/google/callback
+    |   - login_customer_id: la MCC de OliMedia (solo dígitos, sin guiones). Se
+    |     manda en la cabecera login-customer-id al leer una cuenta de cliente a
+    |     través de la MCC. Cada Cuenta puede sobrescribirlo.
+    |
+    | Lo único propio de cada cliente es su customer_id (el external_id de la
+    | Cuenta) y el refresh token de quien autorizó.
+    */
+    'google_ads' => [
+        'developer_token'   => env('GOOGLE_ADS_DEVELOPER_TOKEN'),
+        'client_id'         => env('GOOGLE_ADS_CLIENT_ID'),
+        'client_secret'     => env('GOOGLE_ADS_CLIENT_SECRET'),
+        'login_customer_id' => env('GOOGLE_ADS_LOGIN_CUSTOMER_ID'),
+        // Debe ser una versión viva de la API; Google retira las antiguas.
+        'api_version'       => env('GOOGLE_ADS_API_VERSION', 'v21'),
+    ],
+
     'resend' => [
         'key' => env('RESEND_API_KEY'),
     ],

@@ -101,7 +101,9 @@ app/
     TikTokParser.php                ← Excel, salta "Total of N results"
     CampaignImporter.php            ← firstOrCreate de Línea + upsert métricas + import_log
   Services/Sync/
+    Conector.php / Conectores.php   ← contrato común + fábrica por plataforma
     MetaConnector.php               ← Marketing API de Meta → importRows() (sección 6b)
+    GoogleAdsConnector.php          ← Google Ads API (GAQL) → importRows() (sección 6b)
   Console/Commands/PortalImport.php ← php artisan portal:import {cuenta_id} {ruta}
   Console/Commands/PortalSync.php   ← php artisan portal:sync {--cuenta=} {--dias=3}
   Http/Controllers/
@@ -109,13 +111,14 @@ app/
     Auth/LoginController.php        ← login cliente; admin → /admin
     AccountController.php           ← /cuenta, cambio de contraseña del cliente
     Conexiones/MetaConexionController.php ← OAuth de Meta (autorizar + callback)
+    Conexiones/GoogleConexionController.php ← OAuth de Google Ads
   Filament/Resources/               ← Clientes, Cuentas, Lineas, PresupuestoEventos,
                                       MetricaDiarias, ImportLogs, Users
   Models/                           ← Cliente, Cuenta, Linea, PresupuestoEvento,
                                       MetricaDiaria, Override, ImportLog, User, ConexionApi
 resources/views/portal/             ← dashboard.blade.php, login.blade.php, cuenta.blade.php
 routes/web.php                      ← /login, /dashboard, /cuenta, /media/logo/{cliente},
-                                      /conexiones/meta/{autorizar,callback}
+                                      /conexiones/{meta,google}/{autorizar,callback}
 routes/console.php                  ← portal:sync diario a las 07:30 (Europe/Madrid)
 database/migrations/2026_08_11_*    ← tablas del portal + cliente_id/es_admin en users
 database/migrations/2026_09_23_*    ← conexiones_api (tokens de API por cuenta)
@@ -143,7 +146,8 @@ hay que crear `app/Filament/Resources/Overrides/`.
 - `overrides` — ajustes manuales.
 - `import_logs` — auditoría de importaciones, con `origen` (`manual|api`) y `filas_error`.
 - `conexiones_api` — credenciales de API **por cuenta** (1:1 con `cuentas`). `metodo`
-  (`system_user|oauth`), `access_token` **cifrado** (cast `encrypted`), `expires_at`,
+  (`system_user|oauth` en Meta, `mcc|oauth` en Google), `access_token` y `refresh_token` **cifrados**
+  (cast `encrypted`), `login_customer_id` (la MCC de Google, opcional), `expires_at`,
   `ultima_sincronizacion`, `ultimo_error`.
 - `users` — + `cliente_id`, `es_admin`.
 
@@ -195,7 +199,12 @@ interno ya está resuelto.
 
 ---
 
-## 6b. Sincronización por API: Meta (implementado); Google y TikTok (pendiente)
+## 6b. Sincronización por API: Meta y Google Ads (implementados); TikTok y LinkedIn (pendientes)
+
+Todos los conectores implementan [Conector](app/Services/Sync/Conector.php) (`sincronizar` /
+`sincronizarRango`) y [Conectores::para($cuenta)](app/Services/Sync/Conectores.php) elige el que
+toca. Ni `portal:sync` ni la ficha de la Cuenta saben de plataformas: **añadir TikTok es escribir
+su conector y apuntarlo en `Conectores::PLATAFORMAS`**. Todos acaban en `importRows()`.
 
 [MetaConnector](app/Services/Sync/MetaConnector.php) baja insights de campaña día a día de la
 Marketing API de Meta y los vuelca en `importRows()`. Por eso API e informe manual son
@@ -241,8 +250,35 @@ sincronización no se tira por un dato de apoyo. **Nunca escribe en `presupuesto
 que rebajar días ya importados los sobrescribe. Está en el botón "Sincronizar ahora" (dos fechas
 opcionales) y en el comando (`--desde` / `--hasta`).
 
-Comandos: `php artisan portal:sync` (todas las Meta conectadas), `--cuenta=ID`, `--dias=7`,
-`--desde=2026-04-01 --hasta=2026-07-31`.
+### Google Ads
+
+[GoogleAdsConnector](app/Services/Sync/GoogleAdsConnector.php) consulta GAQL contra
+`googleAds:search` (REST, con paginación) y mapea a las mismas filas normalizadas. Diferencias con
+Meta que explican por qué el código no es simétrico:
+
+- **Tokens en dos escalones**: el `refresh_token` no caduca y con él se pide un `access_token` que
+  dura una hora. El access se guarda en `conexiones_api.access_token` con su `expires_at` y se
+  renueva solo cuando toca. No confundir esa fecha con la vida de la conexión.
+- **Tres credenciales de agencia** en `.env`, comunes a todos los clientes: `developer_token`
+  (aprobado por Google desde la MCC), `client_id`/`client_secret` (proyecto de Google Cloud) y
+  `login_customer_id` (la MCC). Lo único por cliente es su customer ID (`cuentas.external_id`).
+- La cabecera `login-customer-id` y el customer ID van **solo con dígitos**: el conector quita los
+  guiones de `123-456-7890`.
+- Importes en **micros** (1.000.000 = 1 €), no en céntimos.
+- **No hay alcance**: se importa 0.
+- `metrics.conversions` son los leads.
+- Los errores útiles de Google vienen anidados en `error.details[].errors[].message`; el conector
+  los extrae, porque el `error.message` de fuera solo dice "invalid argument".
+
+Dos métodos de conexión, por cuenta: `mcc` (refresh token de la MCC pegado a mano — **uno solo
+sirve para todas las cuentas que cuelgan de ella**) y `oauth` (el cliente autoriza su propia
+cuenta, rutas `/conexiones/google/{autorizar,callback}`). El OAuth pide `access_type=offline` y
+`prompt=consent`: sin ellos Google no devuelve refresh token y la conexión moriría en una hora.
+Al conectar se hace una consulta de prueba, para que el error salga en ese momento y no de
+madrugada.
+
+Comandos: `php artisan portal:sync` (todas las cuentas conectadas, de cualquier plataforma con
+conector), `--cuenta=ID`, `--dias=7`, `--desde=2026-04-01 --hasta=2026-07-31`.
 El cron de Plesk que mueve el scheduler está documentado en docs/DESPLIEGUE.md. El botón
 "Sincronizar ahora" vive en la ficha de la Cuenta; "Desconectar API" borra el token (los datos
 importados se conservan).

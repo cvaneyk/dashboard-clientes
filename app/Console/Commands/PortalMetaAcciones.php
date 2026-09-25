@@ -2,7 +2,7 @@
 
 namespace App\Console\Commands;
 
-use App\Console\Commands\Concerns\MuestraCuentasMeta;
+use App\Console\Commands\Concerns\MuestraCuentasSincronizables;
 use App\Models\Cuenta;
 use App\Services\Sync\MetaConnector;
 use Illuminate\Console\Command;
@@ -22,7 +22,7 @@ use Illuminate\Support\Facades\Http;
  */
 class PortalMetaAcciones extends Command
 {
-    use MuestraCuentasMeta;
+    use MuestraCuentasSincronizables;
 
     protected $signature = 'portal:meta-acciones {cuenta : ID de la cuenta} {--dias=30 : Días hacia atrás a mirar}';
 
@@ -39,7 +39,7 @@ class PortalMetaAcciones extends Command
                 $this->motivoNoSincronizable($cuenta)
             ));
 
-            $this->mostrarCuentasMeta();
+            $this->mostrarCuentasSincronizables(['meta']);
 
             return self::FAILURE;
         }
