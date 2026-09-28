@@ -3,6 +3,7 @@
 use App\Http\Controllers\AccountController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Conexiones\GoogleConexionController;
+use App\Http\Controllers\Conexiones\LinkedInConexionController;
 use App\Http\Controllers\Conexiones\MetaConexionController;
 use App\Http\Controllers\DashboardController;
 use App\Models\Cliente;
@@ -59,4 +60,9 @@ Route::middleware('auth:admin')->group(function () {
         ->name('conexiones.google.autorizar');
     Route::get('/conexiones/google/callback', [GoogleConexionController::class, 'callback'])
         ->name('conexiones.google.callback');
+
+    Route::get('/conexiones/linkedin/autorizar', [LinkedInConexionController::class, 'autorizar'])
+        ->name('conexiones.linkedin.autorizar');
+    Route::get('/conexiones/linkedin/callback', [LinkedInConexionController::class, 'callback'])
+        ->name('conexiones.linkedin.callback');
 });

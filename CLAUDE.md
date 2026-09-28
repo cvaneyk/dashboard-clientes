@@ -118,6 +118,7 @@ app/
     Conector.php / Conectores.php   ← contrato común + fábrica por plataforma
     MetaConnector.php               ← Marketing API de Meta → importRows() (sección 6b)
     GoogleAdsConnector.php          ← Google Ads API (GAQL) → importRows() (sección 6b)
+    LinkedInConnector.php           ← LinkedIn Ads API → importRows() (sección 6b)
   Console/Commands/PortalImport.php ← php artisan portal:import {cuenta_id} {ruta}
   Console/Commands/PortalSync.php   ← php artisan portal:sync {--cuenta=} {--dias=3}
   Http/Controllers/
@@ -213,7 +214,7 @@ interno ya está resuelto.
 
 ---
 
-## 6b. Sincronización por API: Meta y Google Ads (implementados); TikTok y LinkedIn (pendientes)
+## 6b. Sincronización por API: Meta, Google Ads y LinkedIn (implementados); TikTok (pendiente)
 
 Todos los conectores implementan [Conector](app/Services/Sync/Conector.php) (`sincronizar` /
 `sincronizarRango`) y [Conectores::para($cuenta)](app/Services/Sync/Conectores.php) elige el que
@@ -290,6 +291,29 @@ cuenta, rutas `/conexiones/google/{autorizar,callback}`). El OAuth pide `access_
 `prompt=consent`: sin ellos Google no devuelve refresh token y la conexión moriría en una hora.
 Al conectar se hace una consulta de prueba, para que el error salga en ese momento y no de
 madrugada.
+
+### LinkedIn Ads
+
+[LinkedInConnector](app/Services/Sync/LinkedInConnector.php). Diferencias que explican su forma:
+
+- **adAnalytics no devuelve el nombre de la campaña, solo su URN.** Hacen falta dos llamadas
+  (analytics + `adCampaigns`) y cruzarlas. Una fila cuyo nombre no se resuelva se manda **sin
+  `match_key`** para que el importador la cuente en `filas_error`: así se ve en el log en lugar de
+  crear una línea llamada `urn:li:sponsoredCampaign:123`.
+- API **versionada por cabecera** (`LinkedIn-Version`, formato AAAAMM) y protocolo Rest.li 2.0, con
+  sintaxis propia de parámetros (`dateRange=(start:(year:…))`) que no es un query string normal:
+  la URL se monta a mano.
+- El coste viene como **decimal en la moneda de la cuenta** (ni micros ni céntimos), y el
+  presupuesto como objeto `{currencyCode, amount}`.
+- La fecha llega troceada en `year`/`month`/`day`.
+- **Dos campos de conversión**: `oneClickLeads` (formularios de LinkedIn) y
+  `externalWebsiteConversions` (Insight Tag). Se resuelven por prioridad reutilizando
+  `cuentas.tipos_conversion`, igual que en Meta y por el mismo motivo: un lead de formulario suele
+  registrarse también como conversión de web.
+- **No hay token de agencia.** El acceso se concede en LinkedIn Business Manager y luego un usuario
+  con ese acceso autoriza por OAuth (`/conexiones/linkedin/{autorizar,callback}`). El access token
+  dura ~60 días y se renueva con el refresh token, que solo dan las apps aprobadas en el
+  **Marketing Developer Platform**; sin esa aprobación no hay ni `r_ads` ni `r_ads_reporting`.
 
 Comandos: `php artisan portal:sync` (todas las cuentas conectadas, de cualquier plataforma con
 conector), `--cuenta=ID`, `--dias=7`, `--desde=2026-04-01 --hasta=2026-07-31`.

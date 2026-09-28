@@ -76,6 +76,39 @@ return [
         'api_version'       => env('GOOGLE_ADS_API_VERSION', 'v25'),
     ],
 
+    /*
+    | LinkedIn Ads (Marketing Developer Platform).
+    |
+    | Requiere una app en developer.linkedin.com asociada a una página de
+    | empresa Y la aprobación del programa Marketing Developer Platform: sin
+    | ella LinkedIn no concede los permisos r_ads / r_ads_reporting y la
+    | conexión no puede leer nada.
+    |
+    | En "Authorized redirect URLs" de la app:
+    |   {APP_URL}/conexiones/linkedin/callback
+    |
+    | api_version es la cabecera LinkedIn-Version, con formato AAAAMM. LinkedIn
+    | retira versiones cada pocos meses; si las llamadas empiezan a fallar por
+    | versión, se cambia aquí sin tocar código.
+    */
+    'linkedin_ads' => [
+        'client_id'     => env('LINKEDIN_ADS_CLIENT_ID'),
+        'client_secret' => env('LINKEDIN_ADS_CLIENT_SECRET'),
+        'api_version'   => env('LINKEDIN_ADS_API_VERSION', '202505'),
+
+        /*
+        | Qué cuenta como lead, por prioridad (mismo criterio que en Meta: se
+        | usa el primer campo con valor, nunca la suma).
+        |   oneClickLeads              → formularios de Lead Gen de LinkedIn
+        |   externalWebsiteConversions → conversiones en la web (Insight Tag)
+        | Cada Cuenta puede sobrescribirlo en su ficha.
+        */
+        'tipos_conversion' => array_values(array_filter(array_map(
+            'trim',
+            explode(',', (string) env('LINKEDIN_ADS_TIPOS_CONVERSION', 'oneClickLeads,externalWebsiteConversions'))
+        ))),
+    ],
+
     'resend' => [
         'key' => env('RESEND_API_KEY'),
     ],

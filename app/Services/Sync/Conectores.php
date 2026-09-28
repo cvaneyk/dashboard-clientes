@@ -14,13 +14,14 @@ use RuntimeException;
 class Conectores
 {
     /** Plataformas con sincronización por API disponible. */
-    public const PLATAFORMAS = ['meta', 'google'];
+    public const PLATAFORMAS = ['meta', 'google', 'linkedin'];
 
     public static function para(Cuenta $cuenta): Conector
     {
         return match ($cuenta->plataforma) {
-            'meta'   => app(MetaConnector::class),
-            'google' => app(GoogleAdsConnector::class),
+            'meta'     => app(MetaConnector::class),
+            'google'   => app(GoogleAdsConnector::class),
+            'linkedin' => app(LinkedInConnector::class),
             default  => throw new RuntimeException(
                 "Todavía no hay sincronización por API para {$cuenta->plataforma}: esa cuenta se alimenta con informes subidos a mano."
             ),

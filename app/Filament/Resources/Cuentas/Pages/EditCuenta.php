@@ -42,8 +42,9 @@ class EditCuenta extends EditRecord
 
     protected function getHeaderActions(): array
     {
-        $soloMeta   = fn () => $this->getRecord()->plataforma === 'meta';
-        $soloGoogle = fn () => $this->getRecord()->plataforma === 'google';
+        $soloMeta     = fn () => $this->getRecord()->plataforma === 'meta';
+        $soloGoogle   = fn () => $this->getRecord()->plataforma === 'google';
+        $soloLinkedin = fn () => $this->getRecord()->plataforma === 'linkedin';
         $conApi     = fn () => Conectores::soportada($this->getRecord()->plataforma);
 
         return [
@@ -157,6 +158,16 @@ class EditCuenta extends EditRecord
                 })
                 ->visible($soloGoogle),
 
+            // LinkedIn no tiene token de agencia: el acceso se concede por
+            // Business Manager y luego alguien con ese acceso autoriza aquí.
+            Action::make('conectarLinkedin')
+                ->label(fn () => $this->getRecord()->conexionApi
+                    ? 'Reconectar con LinkedIn'
+                    : 'Conectar con LinkedIn')
+                ->icon('heroicon-o-link')
+                ->url(fn () => route('conexiones.linkedin.autorizar', ['cuenta' => $this->getRecord()->id]))
+                ->visible($soloLinkedin),
+
             Action::make('sincronizarAhora')
                 ->label('Sincronizar ahora')
                 ->icon('heroicon-o-arrow-path')
@@ -263,13 +274,17 @@ class EditCuenta extends EditRecord
         if (! $conexion) {
             return [
                 Placeholder::make('ayuda')->content(
-                    $this->getRecord()->plataforma === 'google'
-                        ? 'Conecta esta cuenta con la MCC de OliMedia (un refresh token vale para todos los clientes '
-                            . 'que cuelgan de ella) o con la cuenta del propio cliente. Después, la sincronización '
-                            . 'diaria trae los datos sola.'
-                        : 'Conecta esta cuenta con "OAuth del cliente" (cada cliente con su propio acceso a la API) '
-                            . 'o con "token de System User" (cuentas gestionadas por OliMedia). Después, la '
-                            . 'sincronización diaria trae los datos sola.'
+                    match ($this->getRecord()->plataforma) {
+                        'google' => 'Conecta esta cuenta con la MCC de OliMedia (un refresh token vale para todos los '
+                            . 'clientes que cuelgan de ella) o con la cuenta del propio cliente. Después, la '
+                            . 'sincronización diaria trae los datos sola.',
+                        'linkedin' => 'Pide antes acceso a la cuenta del cliente en LinkedIn Business Manager; luego '
+                            . 'conecta aquí con un usuario que tenga ese acceso. Requiere que vuestra app esté '
+                            . 'aprobada en el Marketing Developer Platform.',
+                        default => 'Conecta esta cuenta con "OAuth del cliente" (cada cliente con su propio acceso a '
+                            . 'la API) o con "token de System User" (cuentas gestionadas por OliMedia). Después, la '
+                            . 'sincronización diaria trae los datos sola.',
+                    }
                 ),
             ];
         }

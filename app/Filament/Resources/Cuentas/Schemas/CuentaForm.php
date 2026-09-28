@@ -37,8 +37,10 @@ class CuentaForm
                 TextInput::make('tipos_conversion')
                     ->label('Qué cuenta como lead (opcional)')
                     ->placeholder(implode(',', (array) config('services.meta.tipos_conversion')))
-                    ->helperText('Tipos de conversión de Meta separados por comas, por orden de prioridad: se usa el primero que aparezca en cada campaña. Vacío = la lista por defecto. Para ver cuáles devuelve esta cuenta: php artisan portal:meta-acciones {id}')
-                    ->visible(fn ($get) => $get('plataforma') === 'meta')
+                    ->helperText(fn ($get) => $get('plataforma') === 'linkedin'
+                        ? 'Campos de conversión de LinkedIn separados por comas, por orden de prioridad: se usa el primero con valor. Por defecto oneClickLeads (formularios) y luego externalWebsiteConversions (Insight Tag).'
+                        : 'Tipos de conversión de Meta separados por comas, por orden de prioridad: se usa el primero que aparezca en cada campaña. Vacío = la lista por defecto. Para ver cuáles devuelve esta cuenta: php artisan portal:meta-acciones {id}')
+                    ->visible(fn ($get) => in_array($get('plataforma'), ['meta', 'linkedin'], true))
                     ->columnSpanFull(),
                 Toggle::make('activo')
                     ->label('Activa')
