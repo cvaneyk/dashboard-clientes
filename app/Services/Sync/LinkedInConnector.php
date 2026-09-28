@@ -37,7 +37,11 @@ use Throwable;
  */
 class LinkedInConnector implements Conector
 {
-    private const SCOPE = 'r_ads r_ads_reporting';
+    /** Permisos a pedir; deben coincidir con los concedidos a la app. */
+    private function scopes(): string
+    {
+        return (string) config('services.linkedin_ads.scopes', 'r_ads r_ads_reporting');
+    }
 
     public function __construct(private CampaignImporter $importer)
     {
@@ -77,7 +81,7 @@ class LinkedInConnector implements Conector
                 'client_id'     => config('services.linkedin_ads.client_id'),
                 'redirect_uri'  => $redirectUri,
                 'state'         => $estado,
-                'scope'         => self::SCOPE,
+                'scope'         => $this->scopes(),
             ],
             '',
             '&',

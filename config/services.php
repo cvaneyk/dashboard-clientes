@@ -97,6 +97,17 @@ return [
         'api_version'   => env('LINKEDIN_ADS_API_VERSION', '202505'),
 
         /*
+        | Permisos que se piden al autorizar. Tienen que coincidir EXACTAMENTE
+        | con los que la app tenga concedidos (pestaña Auth → "OAuth 2.0
+        | scopes"); si no, LinkedIn responde "The requested permission scope is
+        | not valid" y no deja ni empezar.
+        |
+        | Configurable para poder ajustarlos sin desplegar código el día que
+        | LinkedIn conceda un juego distinto al aprobar los productos.
+        */
+        'scopes' => env('LINKEDIN_ADS_SCOPES', 'r_ads r_ads_reporting'),
+
+        /*
         | Qué cuenta como lead, por prioridad (mismo criterio que en Meta: se
         | usa el primer campo con valor, nunca la suma).
         |   oneClickLeads              → formularios de Lead Gen de LinkedIn
