@@ -21,6 +21,8 @@ use Throwable;
  */
 class LinkedInConexionController extends Controller
 {
+    use ExplicaErrorDelProveedor;
+
     public function autorizar(Request $request, LinkedInConnector $connector): RedirectResponse
     {
         $cuenta = Cuenta::findOrFail($request->query('cuenta'));
@@ -48,8 +50,8 @@ class LinkedInConexionController extends Controller
     {
         $estado = (array) $request->session()->pull('conexiones.linkedin', []);
 
-        if ($request->query('error')) {
-            return $this->volver($estado, 'error', 'Conexión cancelada desde LinkedIn.');
+        if ($error = $request->query('error')) {
+            return $this->volver($estado, 'error', $this->motivo($request, 'LinkedIn', $error));
         }
 
         $nonceRecibido = (string) $request->query('state', '');

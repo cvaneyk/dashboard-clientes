@@ -22,6 +22,8 @@ use Throwable;
  */
 class GoogleConexionController extends Controller
 {
+    use ExplicaErrorDelProveedor;
+
     public function autorizar(Request $request, GoogleAdsConnector $connector): RedirectResponse
     {
         $cuenta = Cuenta::findOrFail($request->query('cuenta'));
@@ -49,8 +51,8 @@ class GoogleConexionController extends Controller
     {
         $estado = (array) $request->session()->pull('conexiones.google', []);
 
-        if ($request->query('error')) {
-            return $this->volver($estado, 'error', 'Conexión cancelada desde Google.');
+        if ($error = $request->query('error')) {
+            return $this->volver($estado, 'error', $this->motivo($request, 'Google', $error));
         }
 
         $nonceRecibido = (string) $request->query('state', '');

@@ -22,6 +22,8 @@ use Throwable;
  */
 class MetaConexionController extends Controller
 {
+    use ExplicaErrorDelProveedor;
+
     /** Paso 1: manda al admin (o al cliente) al diálogo de Facebook Login. */
     public function autorizar(Request $request, MetaConnector $connector): RedirectResponse
     {
@@ -52,9 +54,10 @@ class MetaConexionController extends Controller
     {
         $estado = (array) $request->session()->pull('conexiones.meta', []);
 
-        // El usuario canceló el diálogo o Facebook devolvió error_code.
-        if ($request->query('error')) {
-            return $this->volver($estado, 'error', 'Conexión cancelada desde Facebook.');
+        // El usuario canceló el diálogo, o Facebook rechazó algo y lo explica
+        // en error_description.
+        if ($error = $request->query('error')) {
+            return $this->volver($estado, 'error', $this->motivo($request, 'Meta', $error));
         }
 
         $nonceRecibido = (string) $request->query('state', '');
