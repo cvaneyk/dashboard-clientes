@@ -14,6 +14,14 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         // Los invitados al área privada van al login del portal.
         $middleware->redirectGuestsTo('/login');
+
+        // En Plesk el SSL termina en el proxy y a PHP le llega la petición como
+        // HTTP plano: sin esto Laravel genera URLs absolutas con http:// aunque
+        // el sitio sea https. Se nota en los redirect_uri de OAuth, que las
+        // plataformas comparan carácter por carácter y rechazan.
+        // '*' es lo correcto aquí porque el backend PHP solo es accesible a
+        // través del proxy, nunca directamente desde fuera.
+        $middleware->trustProxies(at: '*');
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(
