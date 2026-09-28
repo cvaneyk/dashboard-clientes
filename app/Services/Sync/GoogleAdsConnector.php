@@ -268,9 +268,9 @@ class GoogleAdsConnector implements Conector
                 ->withHeaders($this->cabeceras($conexion))
                 ->timeout(120)
                 ->retry(2, 500, throw: false)
+                // Sin pageSize: desde v17 Google lo rechaza y pagina fijo a 10.000 filas.
                 ->post($url, array_filter([
                     'query'     => $gaql,
-                    'pageSize'  => 10000,
                     'pageToken' => $pageToken,
                 ]));
 
