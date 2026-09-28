@@ -89,6 +89,15 @@ Las rutas del portal usan `auth:web,admin` (dos guards admitidos, **no unificado
 entra por `/login` con el guard `web` y el admin llega desde Filament con el guard `admin`. Las
 sesiones siguen siendo independientes, que es lo que arregló el 403.
 
+Dos costuras que deja esa separación, ya cosidas y con test:
+
+- Un admin que entra por `/login` autentica el guard `web`, pero `/admin` pide el guard `admin`.
+  `LoginController::destino()` abre **también** la sesión de panel (mismas credenciales recién
+  verificadas) para que no tenga que identificarse dos veces.
+- `/` manda al admin a `/admin` **siempre**, así que el dashboard no es alcanzable desde ahí. Se
+  llega por `/dashboard`, por el enlace "Ver dashboard de cliente" del menú de Filament o por la
+  acción "Ver dashboard" de la lista de Clientes.
+
 Tras tocar `config/auth.php` en producción: `php artisan optimize:clear` y volver a iniciar
 sesión, o el cambio no surte efecto.
 

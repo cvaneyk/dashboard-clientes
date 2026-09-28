@@ -56,6 +56,14 @@ class LoginController extends Controller
         $user = Auth::user();
 
         if ($user->es_admin) {
+            // Este login autentica el guard 'web'; el panel usa el guard 'admin'.
+            // Sin esto, un admin que entra por /login llega a /admin y tiene que
+            // volver a identificarse con las mismas credenciales que acaba de dar.
+            // Los guards siguen separados: son dos sesiones, no una compartida.
+            if (! Auth::guard('admin')->check()) {
+                Auth::guard('admin')->login($user);
+            }
+
             return redirect('/admin');
         }
 
