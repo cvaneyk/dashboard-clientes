@@ -81,8 +81,13 @@ Así un admin y un cliente pueden estar logueados a la vez sin pisarse la sesió
 
 Tipos de usuario (`users.cliente_id`, `users.es_admin`):
 
-- **Admin / account manager**: `es_admin = true`, `cliente_id = null` → panel `/admin`.
+- **Admin / account manager**: `es_admin = true`, `cliente_id = null` → panel `/admin`, y además
+  puede abrir `/dashboard` y cambiar de cliente con el selector (sección 7).
 - **Cliente**: `cliente_id = X` → solo ve el dashboard de SU cliente.
+
+Las rutas del portal usan `auth:web,admin` (dos guards admitidos, **no unificados**): el cliente
+entra por `/login` con el guard `web` y el admin llega desde Filament con el guard `admin`. Las
+sesiones siguen siendo independientes, que es lo que arregló el 403.
 
 Tras tocar `config/auth.php` en producción: `php artisan optimize:clear` y volver a iniciar
 sesión, o el cambio no surte efecto.
@@ -292,7 +297,21 @@ importados se conservan).
 
 Funciona como SPA: el controlador vuelca a la página **todo el dataset diario por línea/canal en
 JSON** y el navegador resuelve rango de fechas, comparación, filtros por canal, orden, búsqueda,
-paginación y gráfico sin recargar. Scope estricto por `cliente_id`.
+paginación y gráfico sin recargar.
+
+**Scope y selector de cliente.** El alcance lo decide `User::clientesVisibles()`, que es la única
+fuente de verdad: un usuario de cliente ve el suyo, un admin ve todos los clientes activos.
+Ampliar el acceso (una cartera por usuario, un permiso de solo lectura) es cambiar **ese método**,
+no los controladores. Reglas que no se pueden romper:
+
+- El cliente a pintar se resuelve **siempre contra esa lista**, nunca desde la URL. Un slug que no
+  esté permitido se ignora y se cae al primero, sin filtrar si ese cliente existe.
+- La página lleva el dataset de **un solo cliente**, así que el selector recarga (`?cliente=slug`,
+  con la última elección recordada en sesión). No mandes varios clientes al navegador.
+- Para el admin es la **vista del cliente**: `gasto_real` y el tope de plataforma siguen sin salir.
+  Se marca con una etiqueta "vista de cliente" y el enlace de volver al panel.
+
+Desde `/admin → Clientes` hay una acción "Ver dashboard" que abre el de ese cliente.
 
 Incluye: presets de rango (7/30 días, este mes, mes anterior, todo), comparación con periodo
 anterior y deltas en los KPIs, selector de métrica del gráfico, chips por canal, tarjetas por canal

@@ -25,7 +25,13 @@ Route::post('/login', [LoginController::class, 'login'])->name('portal.login.att
 Route::post('/logout', [LoginController::class, 'logout'])->name('portal.logout');
 
 // Zona privada del cliente.
-Route::middleware('auth')->group(function () {
+//
+// Acepta los DOS guards a propósito: el cliente entra por /login (guard 'web')
+// y el admin por el panel de Filament (guard 'admin'), y este último también
+// tiene que poder abrir el dashboard para verlo como lo ve el cliente. Los
+// guards siguen separados —sesiones independientes, que es lo que arregló el
+// 403—; lo único que se hace aquí es admitir cualquiera de los dos.
+Route::middleware('auth:web,admin')->group(function () {
     Route::get('/', function () {
         // Los admin van a Filament; los clientes al dashboard.
         return Auth::user()->es_admin

@@ -2,18 +2,28 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Cliente;
 use App\Models\MetricaDiaria;
 use App\Services\PricingEngine;
 use Carbon\Carbon;
 use Carbon\CarbonPeriod;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 
 /**
  * Dashboard del cliente. Exporta TODO el dataset diario (por campaña y canal)
  * al navegador; el filtrado, comparación, orden, búsqueda y gráfico se resuelven
- * en el cliente (JS) sin recargar. Scope estricto por cliente_id.
+ * en el cliente (JS) sin recargar.
+ *
+ * SCOPE: un usuario de cliente ve solo el suyo; un admin puede cambiar de
+ * cliente con el selector de la cabecera. El cliente a pintar se resuelve
+ * SIEMPRE contra User::clientesVisibles(), nunca directamente desde la URL:
+ * es el punto donde un portal multicliente se convierte en una fuga de datos.
+ * Por eso tampoco se manda a la página el dataset de varios clientes a la vez,
+ * cambiar de cliente recarga.
  */
 class DashboardController extends Controller
 {
@@ -24,10 +34,19 @@ class DashboardController extends Controller
         'linkedin' => 'LinkedIn Ads',
     ];
 
-    public function index(Request $request, PricingEngine $engine): View
+    public function index(Request $request, PricingEngine $engine): View|RedirectResponse
     {
-        $user    = Auth::user();
-        $cliente = $user->cliente;
+        $user     = Auth::user();
+        $visibles = $user->clientesVisibles();
+
+        if ($visibles->isEmpty()) {
+            // Admin sin ningún cliente dado de alta, o usuario sin cliente.
+            return $user->es_admin
+                ? redirect('/admin')
+                : redirect()->route('portal.login');
+        }
+
+        $cliente = $this->clienteSeleccionado($request, $visibles);
 
         $lineas = $cliente->lineas()->where('activo', true)->get();
 
@@ -125,6 +144,32 @@ class DashboardController extends Controller
             'logo'     => $logoUrl,
         ];
 
-        return view('portal.dashboard', ['cliente' => $cliente, 'data' => $data, 'logoUrl' => $logoUrl]);
+        return view('portal.dashboard', [
+            'cliente'  => $cliente,
+            'data'     => $data,
+            'logoUrl'  => $logoUrl,
+            'visibles' => $visibles,
+            'esAdmin'  => (bool) $user->es_admin,
+        ]);
+    }
+
+    /**
+     * Qué cliente se pinta. El slug llega por la URL (selector) o de la última
+     * elección guardada en sesión, y en ambos casos se busca DENTRO de los
+     * clientes permitidos: un slug que no esté en esa lista se ignora y se cae
+     * al primero, sin filtrar siquiera si ese cliente existe o no.
+     *
+     * @param  Collection<int,Cliente>  $visibles
+     */
+    private function clienteSeleccionado(Request $request, Collection $visibles): Cliente
+    {
+        $pedido = $request->query('cliente') ?? $request->session()->get('portal.cliente');
+
+        $cliente = is_string($pedido) ? $visibles->firstWhere('slug', $pedido) : null;
+        $cliente ??= $visibles->first();
+
+        $request->session()->put('portal.cliente', $cliente->slug);
+
+        return $cliente;
     }
 }

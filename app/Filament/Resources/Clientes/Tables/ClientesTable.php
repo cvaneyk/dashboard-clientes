@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\Clientes\Tables;
 
+use App\Models\Cliente;
+use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
@@ -38,6 +40,15 @@ class ClientesTable
             ->defaultSort('nombre')
             ->recordActions([
                 EditAction::make(),
+                // Abre el dashboard tal y como lo ve ese cliente. Útil para
+                // revisar antes de una reunión sin pedirle sus credenciales.
+                Action::make('verDashboard')
+                    ->label('Ver dashboard')
+                    ->icon('heroicon-o-presentation-chart-line')
+                    ->color('gray')
+                    ->url(fn (Cliente $record) => route('portal.dashboard', ['cliente' => $record->slug]))
+                    ->openUrlInNewTab()
+                    ->visible(fn (Cliente $record) => $record->activo),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([

@@ -20,6 +20,9 @@
 		.top__actions{display:flex;align-items:center;gap:16px}
 		.tlink{color:var(--mut);font-size:.9rem;text-decoration:none;font-weight:600}
 		.tlink:hover{color:var(--green)}
+		.csel select{font:inherit;font-size:.9rem;padding:6px 10px;border:1px solid #d9e2dc;border-radius:8px;background:#fff;color:inherit;cursor:pointer;max-width:220px}
+		.csel select:focus{outline:2px solid var(--green);outline-offset:1px}
+		.vista{font-size:.75rem;color:var(--mut);border:1px solid #d9e2dc;border-radius:999px;padding:3px 9px;white-space:nowrap}
 		.pagehead{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:clamp(22px,3vw,32px) 0 18px}
 		.exports{display:flex;gap:8px}
 		.xbtn{border:1.4px solid var(--border);background:#fff;border-radius:10px;padding:8px 14px;font-size:.86rem;font-weight:700;color:var(--green-dark);cursor:pointer}
@@ -115,8 +118,25 @@
 				</div>
 			</div>
 			<div class="top__actions">
-				<a class="tlink" href="{{ route('portal.cuenta') }}">Mi cuenta</a>
-				<form method="post" action="{{ route('portal.logout') }}">@csrf<button class="logout" type="submit">Salir</button></form>
+				@if ($visibles->count() > 1)
+					{{-- Selector de cliente: recarga la página, porque el dataset
+					     que se vuelca al navegador es solo el del cliente activo. --}}
+					<form method="get" action="{{ route('portal.dashboard') }}" class="csel">
+						<select name="cliente" onchange="this.form.submit()" aria-label="Cliente">
+							@foreach ($visibles as $c)
+								<option value="{{ $c->slug }}" @selected($c->id === $cliente->id)>{{ $c->nombre }}</option>
+							@endforeach
+						</select>
+					</form>
+				@endif
+
+				@if ($esAdmin)
+					<span class="vista">vista de cliente</span>
+					<a class="tlink" href="/admin">← Panel</a>
+				@else
+					<a class="tlink" href="{{ route('portal.cuenta') }}">Mi cuenta</a>
+					<form method="post" action="{{ route('portal.logout') }}">@csrf<button class="logout" type="submit">Salir</button></form>
+				@endif
 			</div>
 		</div>
 	</div>
