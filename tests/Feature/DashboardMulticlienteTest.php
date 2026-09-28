@@ -21,6 +21,17 @@ class DashboardMulticlienteTest extends TestCase
 {
     use RefreshDatabase;
 
+    /**
+     * OJO con los nombres: el dataset viaja como JSON y json_encode escapa lo
+     * no-ASCII (la Ñ sale como Ñ). Con acentos, un assertDontSee
+     * pasaría siempre, por buscar algo que no puede aparecer, y los tests de
+     * aislamiento —que son el motivo de este fichero— no comprobarían nada.
+     */
+    private function campana(string $slug): string
+    {
+        return 'CAMPANA DE ' . strtoupper($slug);
+    }
+
     private function cliente(string $nombre, string $slug): Cliente
     {
         $cliente = Cliente::create(['nombre' => $nombre, 'slug' => $slug, 'activo' => true]);
@@ -36,8 +47,8 @@ class DashboardMulticlienteTest extends TestCase
             'cliente_id' => $cliente->id,
             'cuenta_id'  => $cuenta->id,
             'plataforma' => 'meta',
-            'nombre'     => 'CAMPAÑA DE ' . strtoupper($slug),
-            'match_key'  => Linea::normalizar('CAMPAÑA DE ' . $slug),
+            'nombre'     => $this->campana($slug),
+            'match_key'  => Linea::normalizar($this->campana($slug)),
             'nivel'      => 'campania',
             'activo'     => true,
         ]);
@@ -98,8 +109,8 @@ class DashboardMulticlienteTest extends TestCase
         $this->actingAs($this->admin(), 'admin')
             ->get('/dashboard?cliente=otra-escuela')
             ->assertSuccessful()
-            ->assertSee('CAMPAÑA DE OTRA-ESCUELA')
-            ->assertDontSee('CAMPAÑA DE MI-UNIVERSIDAD');
+            ->assertSee('CAMPANA DE OTRA-ESCUELA')
+            ->assertDontSee('CAMPANA DE MI-UNIVERSIDAD');
     }
 
     public function test_un_cliente_no_puede_espiar_a_otro_por_la_url(): void
@@ -113,8 +124,8 @@ class DashboardMulticlienteTest extends TestCase
 
         // El parámetro se ignora: sigue viendo lo suyo, sin filtrar siquiera
         // que ese otro cliente existe.
-        $respuesta->assertSee('CAMPAÑA DE MI-UNIVERSIDAD');
-        $respuesta->assertDontSee('CAMPAÑA DE OTRA-ESCUELA');
+        $respuesta->assertSee('CAMPANA DE MI-UNIVERSIDAD');
+        $respuesta->assertDontSee('CAMPANA DE OTRA-ESCUELA');
         $respuesta->assertDontSee('Otra escuela');
     }
 
@@ -149,7 +160,7 @@ class DashboardMulticlienteTest extends TestCase
             ->get('/dashboard?cliente=cliente-de-baja')
             ->assertSuccessful()
             ->assertSee('Mi universidad')
-            ->assertDontSee('CAMPAÑA DE CLIENTE-DE-BAJA');
+            ->assertDontSee('CAMPANA DE CLIENTE-DE-BAJA');
     }
 
     public function test_recuerda_el_cliente_elegido_entre_visitas(): void
@@ -164,7 +175,7 @@ class DashboardMulticlienteTest extends TestCase
         $this->actingAs($admin, 'admin')
             ->get('/dashboard')
             ->assertSuccessful()
-            ->assertSee('CAMPAÑA DE OTRA-ESCUELA');
+            ->assertSee('CAMPANA DE OTRA-ESCUELA');
     }
 
     public function test_el_admin_sin_clientes_dados_de_alta_vuelve_al_panel(): void
