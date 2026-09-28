@@ -35,7 +35,7 @@ class GoogleAdsConnectorTest extends TestCase
             'services.google_ads.client_secret'     => 'secreto',
             'services.google_ads.developer_token'   => 'DEV-TOKEN',
             'services.google_ads.login_customer_id' => '999-888-7777',
-            'services.google_ads.api_version'       => 'v21',
+            'services.google_ads.api_version'       => 'v25',
         ]);
     }
 

@@ -73,7 +73,7 @@ return [
         'client_secret'     => env('GOOGLE_ADS_CLIENT_SECRET'),
         'login_customer_id' => env('GOOGLE_ADS_LOGIN_CUSTOMER_ID'),
         // Debe ser una versión viva de la API; Google retira las antiguas.
-        'api_version'       => env('GOOGLE_ADS_API_VERSION', 'v21'),
+        'api_version'       => env('GOOGLE_ADS_API_VERSION', 'v25'),
     ],
 
     'resend' => [
