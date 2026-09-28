@@ -68,13 +68,21 @@ class LinkedInConnector implements Conector
 
     public function urlAutorizacion(string $estado, string $redirectUri): string
     {
-        return 'https://www.linkedin.com/oauth/v2/authorization?' . http_build_query([
-            'response_type' => 'code',
-            'client_id'     => config('services.linkedin_ads.client_id'),
-            'redirect_uri'  => $redirectUri,
-            'state'         => $estado,
-            'scope'         => self::SCOPE,
-        ]);
+        // RFC3986 a propósito: los scopes van separados por espacios y
+        // http_build_query los codificaría por defecto como '+', que LinkedIn
+        // rechaza. Tiene que ser '%20'.
+        return 'https://www.linkedin.com/oauth/v2/authorization?' . http_build_query(
+            [
+                'response_type' => 'code',
+                'client_id'     => config('services.linkedin_ads.client_id'),
+                'redirect_uri'  => $redirectUri,
+                'state'         => $estado,
+                'scope'         => self::SCOPE,
+            ],
+            '',
+            '&',
+            PHP_QUERY_RFC3986
+        );
     }
 
     /**

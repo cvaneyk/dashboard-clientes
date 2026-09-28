@@ -300,6 +300,21 @@ class LinkedInConnectorTest extends TestCase
         app(LinkedInConnector::class)->sincronizar($cuenta);
     }
 
+    /**
+     * LinkedIn rechaza los scopes separados por '+' (lo que produce
+     * http_build_query por defecto); tienen que ir con '%20'.
+     */
+    public function test_los_scopes_van_separados_por_espacio_codificado(): void
+    {
+        $url = app(LinkedInConnector::class)->urlAutorizacion(
+            'nonce',
+            'https://clientes.olimedia.es/conexiones/linkedin/callback'
+        );
+
+        $this->assertStringContainsString('scope=r_ads%20r_ads_reporting', $url);
+        $this->assertStringNotContainsString('r_ads+r_ads_reporting', $url);
+    }
+
     public function test_el_callback_con_state_falsificado_no_conecta(): void
     {
         $cuenta = $this->cuentaLinkedin();
