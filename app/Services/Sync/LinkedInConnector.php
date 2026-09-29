@@ -505,8 +505,19 @@ class LinkedInConnector implements Conector
     {
         $mensaje = $json['message'] ?? data_get($json, 'error.message');
 
-        return is_string($mensaje) && $mensaje !== ''
+        $texto = is_string($mensaje) && $mensaje !== ''
             ? $mensaje
             : mb_substr($cuerpo, 0, 300);
+
+        // LinkedIn retira las versiones de más de ~1 año, así que este fallo
+        // reaparecerá cada cierto tiempo. El mensaje a secas no dice qué hacer.
+        if (str_contains(mb_strtolower($texto), 'is not active')) {
+            $texto .= sprintf(
+                ' · La versión en uso es %s. Sube LINKEDIN_ADS_API_VERSION en el .env (formato AAAAMM) a una activa y ejecuta optimize:clear.',
+                (string) config('services.linkedin_ads.api_version')
+            );
+        }
+
+        return $texto;
     }
 }

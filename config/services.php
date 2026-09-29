@@ -94,7 +94,10 @@ return [
     'linkedin_ads' => [
         'client_id'     => env('LINKEDIN_ADS_CLIENT_ID'),
         'client_secret' => env('LINKEDIN_ADS_CLIENT_SECRET'),
-        'api_version'   => env('LINKEDIN_ADS_API_VERSION', '202505'),
+        // LinkedIn mantiene activas ~12 meses de versiones y retira las viejas,
+        // así que este valor CADUCA. Si empieza a fallar con "Requested version
+        // ... is not active", se sube por .env sin tocar código.
+        'api_version'   => env('LINKEDIN_ADS_API_VERSION', '202608'),
 
         /*
         | Permisos que se piden al autorizar. Tienen que coincidir EXACTAMENTE

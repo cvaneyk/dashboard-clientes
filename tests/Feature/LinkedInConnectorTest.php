@@ -315,6 +315,29 @@ class LinkedInConnectorTest extends TestCase
         $this->assertStringNotContainsString('r_ads+r_ads_reporting', $url);
     }
 
+    /**
+     * LinkedIn retira las versiones de más de ~1 año, así que este fallo
+     * reaparecerá solo con el tiempo. El mensaje tiene que decir qué tocar.
+     */
+    public function test_si_la_version_esta_retirada_el_error_dice_como_arreglarlo(): void
+    {
+        $cuenta   = $this->cuentaLinkedin();
+        $conexion = $this->conexion($cuenta);
+
+        Http::fake(fn () => Http::response(['message' => 'Requested version 20250501 is not active'], 400));
+
+        try {
+            app(LinkedInConnector::class)->sincronizar($cuenta);
+            $this->fail('Debe lanzar.');
+        } catch (\RuntimeException $e) {
+            $this->assertStringContainsString('is not active', $e->getMessage());
+            $this->assertStringContainsString('LINKEDIN_ADS_API_VERSION', $e->getMessage());
+            $this->assertStringContainsString('202505', $e->getMessage(), 'Debe decir qué versión se está usando');
+        }
+
+        $this->assertStringContainsString('LINKEDIN_ADS_API_VERSION', (string) $conexion->refresh()->ultimo_error);
+    }
+
     public function test_el_callback_con_state_falsificado_no_conecta(): void
     {
         $cuenta = $this->cuentaLinkedin();
