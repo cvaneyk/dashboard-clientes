@@ -130,7 +130,9 @@
 				@if ($visibles->count() > 1)
 					{{-- Selector de cliente: recarga la página, porque el dataset
 					     que se vuelca al navegador es solo el del cliente activo. --}}
-					<form method="get" action="{{ route('portal.dashboard') }}" class="csel">
+					{{-- Se queda en la vista en la que estés: desde la interna,
+					     cambiar de cliente no debe devolverte a la del cliente. --}}
+					<form method="get" action="{{ route($esInterno ? 'portal.dashboard.interno' : 'portal.dashboard') }}" class="csel">
 						<select name="cliente" onchange="this.form.submit()" aria-label="Cliente">
 							@foreach ($visibles as $c)
 								<option value="{{ $c->slug }}" @selected($c->id === $cliente->id)>{{ $c->nombre }}</option>

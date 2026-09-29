@@ -150,6 +150,28 @@ class DashboardInternoTest extends TestCase
             ->assertSee('Datos internos');
     }
 
+    /** Cambiar de cliente desde la vista interna no puede devolverte a la del cliente. */
+    public function test_el_selector_de_cliente_se_queda_en_la_vista_interna(): void
+    {
+        Cliente::create(['nombre' => 'Otra escuela', 'slug' => 'otra-escuela', 'activo' => true]);
+
+        $this->actingAs($this->admin(), 'admin')
+            ->get('/dashboard/interno')
+            ->assertSuccessful()
+            ->assertSee('action="' . route('portal.dashboard.interno') . '"', false)
+            ->assertDontSee('action="' . route('portal.dashboard') . '"', false);
+    }
+
+    public function test_el_selector_de_cliente_apunta_al_dashboard_normal_en_la_vista_de_cliente(): void
+    {
+        Cliente::create(['nombre' => 'Otra escuela', 'slug' => 'otra-escuela', 'activo' => true]);
+
+        $this->actingAs($this->admin(), 'admin')
+            ->get('/dashboard')
+            ->assertSuccessful()
+            ->assertSee('action="' . route('portal.dashboard') . '"', false);
+    }
+
     public function test_el_panel_enlaza_a_la_vista_interna(): void
     {
         $this->actingAs($this->admin(), 'admin')
