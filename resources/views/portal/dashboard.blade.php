@@ -188,6 +188,14 @@
 			</div>
 			<div class="dr">Desde <input type="date" id="from"> Hasta <input type="date" id="to"></div>
 			<label class="cmp"><input type="checkbox" id="compare"> Comparar con periodo anterior</label>
+			{{-- Agrupar por producto une la misma línea de negocio aunque esté
+			     repartida en varias campañas y varios canales. --}}
+			<label class="cmp">Agrupar por
+				<select class="mini" id="groupBy">
+					<option value="canal">Canal</option>
+					<option value="producto">Producto</option>
+				</select>
+			</label>
 			<div class="grow"></div>
 			<div class="seg" id="chanfilter"></div>
 		</div>
@@ -199,10 +207,6 @@
 			<div class="card__head">
 				<h2>Evolución diaria</h2>
 				<div class="ctrls">
-					<select class="mini" id="groupBy">
-						<option value="canal">Por canal</option>
-						<option value="linea">Por línea</option>
-					</select>
 					<select class="mini" id="metric">
 						<option value="c">{{ $etiquetaCoste }}</option>
 						<option value="k">Clics</option>
@@ -394,12 +398,12 @@
 		for(const r of DATA.rows){
 			if(r.f<S.from || r.f>S.to) continue;
 			if(S.channel!=='all' ? r.p!==S.channel : !S.chartCh[r.p]) continue;
-			const serie = S.groupBy==='linea' ? r.camp : r.p;
+			const serie = S.groupBy==='producto' ? r.camp : r.p;
 			const porFecha = acc[serie] = acc[serie] || {};
 			const o = porFecha[r.f] = porFecha[r.f] || {c:0,k:0,l:0,i:0};
 			o.c+=r.c; o.k+=r.k; o.l+=r.l; o.i+=r.i;
 		}
-		if(S.groupBy!=='linea') return acc;
+		if(S.groupBy!=='producto') return acc;
 
 		// Se ordenan por coste y las sobrantes se funden en una sola serie.
 		const total = s => Object.values(acc[s]).reduce((t,o)=>t+o.c,0);
@@ -426,7 +430,7 @@
 
 		const M = METRICAS[S.metric] || METRICAS.c;
 		const acc = acumuladoPorSerie(dates);
-		const porLinea = S.groupBy==='linea';
+		const porProducto = S.groupBy==='producto';
 		const vacio = {c:0,k:0,l:0,i:0};
 
 		const series = Object.keys(acc).sort((a,b)=>{
@@ -435,9 +439,9 @@
 		});
 
 		const datasets = series.map(s=>{
-			const color = porLinea ? colorLinea(s) : chColor(s);
+			const color = porProducto ? colorLinea(s) : chColor(s);
 			return {
-				label: porLinea ? s : chName(s),
+				label: porProducto ? s : chName(s),
 				data: dates.map(f=>Math.round(M.calc(acc[s][f]||vacio)*100)/100),
 				borderColor:color, backgroundColor:color,
 				tension:.3, borderWidth:2.4, pointRadius:0, fill:false,
@@ -500,7 +504,16 @@
 	function campaignRows(){
 		const rows=rowsIn(S.from,S.to,S.channel);
 		const map={};
-		for(const r of rows){const key=r.p+'|'+r.camp;(map[key]=map[key]||{camp:r.camp,p:r.p,c:0,k:0,l:0,i:0}); const o=map[key];o.c+=r.c;o.k+=r.k;o.l+=r.l;o.i+=r.i;}
+		// Agrupando por producto, la misma línea de negocio se suma aunque esté
+		// repartida en varias campañas y varios canales: la clave deja fuera el
+		// canal y se guardan todos los que aportan, para poder mostrarlos.
+		const porProducto = S.groupBy==='producto';
+		for(const r of rows){
+			const key = porProducto ? r.camp : (r.p+'|'+r.camp);
+			const o = map[key] = map[key] || {camp:r.camp, p:r.p, canales:new Set(), c:0,k:0,l:0,i:0};
+			o.canales.add(r.p);
+			o.c+=r.c;o.k+=r.k;o.l+=r.l;o.i+=r.i;
+		}
 		let arr=Object.values(map).map(o=>({...o,cpc:o.k?o.c/o.k:0,cpl:o.l?o.c/o.l:0}));
 		if(S.q){const q=S.q.toLowerCase();arr=arr.filter(o=>o.camp.toLowerCase().includes(q));}
 		arr.sort((a,b)=>{const d=(b[S.sort]-a[S.sort]); return S.dir==='desc'?d:-d;});
@@ -514,11 +527,15 @@
 		const start=(S.page-1)*S.per;
 		const slice=all.slice(start,start+S.per);
 		const tb=document.getElementById('tbody');
-		tb.innerHTML = slice.length? slice.map(o=>`<tr class="rowc" style="border-left-color:${chColor(o.p)}">
+		tb.innerHTML = slice.length? slice.map(o=>{
+			// Agrupado por producto, una fila puede venir de varios canales.
+			const canales = [...o.canales];
+			const celda = canales.map(p=>`<span class="cdot"><span class="dot" style="background:${chColor(p)}"></span>${chName(p)}</span>`).join(' ');
+			return `<tr class="rowc" style="border-left-color:${chColor(canales[0])}">
 			<td>${o.camp}</td>
-			<td><span class="cdot"><span class="dot" style="background:${chColor(o.p)}"></span>${chName(o.p)}</span></td>
+			<td>${celda}</td>
 			<td class="val">${eur(o.c)}</td><td>${n0(o.i)}</td><td>${n0(o.k)}</td><td>${n0(o.l)}</td><td>${eur(o.cpc)}</td><td>${eur(o.cpl)}</td>
-		</tr>`).join('') : '<tr><td colspan="8" class="empty">Sin campañas para estos filtros.</td></tr>';
+		</tr>`;}).join('') : '<tr><td colspan="8" class="empty">Sin campañas para estos filtros.</td></tr>';
 		document.querySelectorAll('#thead th[data-k]').forEach(th=>{
 			th.classList.toggle('act', th.dataset.k===S.sort);
 			th.querySelector('.ar').textContent = th.dataset.k===S.sort ? (S.dir==='desc'?'▾':'▴') : '▾';
@@ -565,7 +582,7 @@
 	document.getElementById('to').onchange=e=>{S.to=e.target.value;S.page=1;renderAll();};
 	document.getElementById('compare').onchange=e=>{S.compare=e.target.checked;renderKPIs();};
 	document.getElementById('metric').onchange=e=>{S.metric=e.target.value;renderChart();};
-	document.getElementById('groupBy').onchange=e=>{S.groupBy=e.target.value;renderChart();};
+	document.getElementById('groupBy').onchange=e=>{S.groupBy=e.target.value;S.page=1;renderAll();};
 	document.getElementById('search').oninput=e=>{S.q=e.target.value;S.page=1;renderTable();};
 	document.getElementById('perpage').onchange=e=>{S.per=parseInt(e.target.value,10);S.page=1;renderTable();};
 	document.querySelectorAll('#thead th[data-k]').forEach(th=>th.onclick=()=>{
@@ -579,7 +596,7 @@
 		const q=s=>'"'+String(s).replace(/"/g,'""')+'"';
 		const lines=[head.map(q).join(';')];
 		for(const o of rows){
-			lines.push([o.camp, chName(o.p), dec(o.c), Math.round(o.i), Math.round(o.k), dec(o.l), dec(o.cpc), dec(o.cpl)].map(q).join(';'));
+			lines.push([o.camp, [...o.canales].map(chName).join(' + '), dec(o.c), Math.round(o.i), Math.round(o.k), dec(o.l), dec(o.cpc), dec(o.cpl)].map(q).join(';'));
 		}
 		const blob=new Blob(['﻿'+lines.join('\r\n')],{type:'text/csv;charset=utf-8'});
 		const a=document.createElement('a');
