@@ -42,6 +42,11 @@ Route::middleware('auth:web,admin')->group(function () {
 
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('portal.dashboard');
 
+    // Misma pantalla con el gasto real de plataforma en vez del coste
+    // facturado. Solo admins: el propio controlador aborta si no lo es.
+    Route::get('/dashboard/interno', [DashboardController::class, 'interno'])
+        ->name('portal.dashboard.interno');
+
     // Mi cuenta (cambio de contraseña del cliente).
     Route::get('/cuenta', [AccountController::class, 'edit'])->name('portal.cuenta');
     Route::post('/cuenta', [AccountController::class, 'update'])->name('portal.cuenta.update');

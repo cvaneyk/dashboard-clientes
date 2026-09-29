@@ -46,6 +46,10 @@ class AdminPanelProvider extends PanelProvider
                     ->url('/dashboard', shouldOpenInNewTab: true)
                     ->icon('heroicon-o-presentation-chart-line')
                     ->sort(99),
+                NavigationItem::make('Dashboard interno (gasto real)')
+                    ->url('/dashboard/interno', shouldOpenInNewTab: true)
+                    ->icon('heroicon-o-eye-slash')
+                    ->sort(100),
             ])
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\Filament\Widgets')
             ->widgets([

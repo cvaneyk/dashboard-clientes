@@ -34,10 +34,29 @@ class DashboardController extends Controller
         'linkedin' => 'LinkedIn Ads',
     ];
 
-    public function index(Request $request, PricingEngine $engine): View|RedirectResponse
+    /**
+     * Vista interna: la misma pantalla, pero con el GASTO REAL de plataforma
+     * en lugar del coste facturado al cliente. Sirve para ver el margen.
+     *
+     * Solo admins. Es la única vista del portal que enseña gasto_real, así que
+     * la puerta se cierra aquí de forma explícita además de por la ruta: un
+     * usuario de cliente no puede llegar ni aunque conozca la URL.
+     */
+    public function interno(Request $request, PricingEngine $engine): View|RedirectResponse
+    {
+        abort_unless(Auth::user()?->es_admin, 403);
+
+        return $this->index($request, $engine, interno: true);
+    }
+
+    public function index(Request $request, PricingEngine $engine, bool $interno = false): View|RedirectResponse
     {
         $user     = Auth::user();
         $visibles = $user->clientesVisibles();
+
+        // Cinturón y tirantes: aunque index() es pública, el modo interno solo
+        // se activa desde interno(), que ya ha comprobado el permiso.
+        $interno = $interno && (bool) $user->es_admin;
 
         if ($visibles->isEmpty()) {
             // Admin sin ningún cliente dado de alta, o usuario sin cliente.
@@ -60,10 +79,16 @@ class DashboardController extends Controller
         $ini = Carbon::parse($min)->startOfDay();
         $fin = Carbon::parse($max)->startOfDay();
 
-        // Métricas reales por línea y día.
+        // Métricas reales por línea y día. gasto_real solo se lee en la vista
+        // interna: en la del cliente ni siquiera sale de la base de datos.
+        $columnas = ['linea_id', 'fecha', 'clics', 'leads', 'impresiones'];
+        if ($interno) {
+            $columnas[] = 'gasto_real';
+        }
+
         $metricas = MetricaDiaria::whereIn('linea_id', $lineas->pluck('id'))
             ->whereBetween('fecha', [$ini->toDateString(), $fin->toDateString()])
-            ->get(['linea_id', 'fecha', 'clics', 'leads', 'impresiones'])
+            ->get($columnas)
             ->groupBy('linea_id');
 
         // Coste-cliente diario por línea (recorriendo los meses de la ventana).
@@ -79,11 +104,16 @@ class DashboardController extends Controller
             $nombre = $linea->producto ?: $linea->nombre;
             $plat   = $linea->plataforma;
 
-            // coste por fecha
+            // Coste por fecha. En la vista del cliente es el objetivo prorrateado
+            // que calcula el motor; en la interna, el gasto real de plataforma.
+            // Va en la MISMA clave a propósito: así toda la página (gráfico,
+            // tabla, KPIs, CSV) funciona igual sin duplicar lógica.
             $coste = [];
-            foreach ($meses as [$y, $m]) {
-                foreach ($engine->costeClienteMes($linea, $y, $m) as $f => $c) {
-                    $coste[$f] = $c;
+            if (! $interno) {
+                foreach ($meses as [$y, $m]) {
+                    foreach ($engine->costeClienteMes($linea, $y, $m) as $f => $c) {
+                        $coste[$f] = $c;
+                    }
                 }
             }
 
@@ -96,6 +126,10 @@ class DashboardController extends Controller
                     'l' => (float) $r->leads,
                     'i' => (int) $r->impresiones,
                 ];
+
+                if ($interno) {
+                    $coste[$f] = round((float) $r->gasto_real, 2);
+                }
             }
 
             // union de fechas dentro de la ventana
@@ -145,11 +179,15 @@ class DashboardController extends Controller
         ];
 
         return view('portal.dashboard', [
-            'cliente'  => $cliente,
-            'data'     => $data,
-            'logoUrl'  => $logoUrl,
-            'visibles' => $visibles,
-            'esAdmin'  => (bool) $user->es_admin,
+            'cliente'       => $cliente,
+            'data'          => $data,
+            'logoUrl'       => $logoUrl,
+            'visibles'      => $visibles,
+            'esAdmin'       => (bool) $user->es_admin,
+            'esInterno'     => $interno,
+            // Que el número diga lo que es: confundir las dos cifras en una
+            // captura de pantalla es justo el riesgo de esta vista.
+            'etiquetaCoste' => $interno ? 'Gasto real' : 'Inversión',
         ]);
     }
 

@@ -23,6 +23,8 @@
 		.csel select{font:inherit;font-size:.9rem;padding:6px 10px;border:1px solid #d9e2dc;border-radius:8px;background:#fff;color:inherit;cursor:pointer;max-width:220px}
 		.csel select:focus{outline:2px solid var(--green);outline-offset:1px}
 		.vista{font-size:.75rem;color:var(--mut);border:1px solid #d9e2dc;border-radius:999px;padding:3px 9px;white-space:nowrap}
+		.interno{background:#7a2020;color:#fff;padding:10px 0;font-size:.9rem}
+		.interno a{color:#fff;margin-left:8px}
 		.pagehead{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:clamp(22px,3vw,32px) 0 18px}
 		.exports{display:flex;gap:8px}
 		.xbtn{border:1.4px solid var(--border);background:#fff;border-radius:10px;padding:8px 14px;font-size:.86rem;font-weight:700;color:var(--green-dark);cursor:pointer}
@@ -131,7 +133,12 @@
 				@endif
 
 				@if ($esAdmin)
-					<span class="vista">vista de cliente</span>
+					@if ($esInterno)
+						<span class="vista">datos internos</span>
+					@else
+						<span class="vista">vista de cliente</span>
+						<a class="tlink" href="{{ route('portal.dashboard.interno') }}">Gasto real</a>
+					@endif
 					<a class="tlink" href="/admin">← Panel</a>
 				@else
 					<a class="tlink" href="{{ route('portal.cuenta') }}">Mi cuenta</a>
@@ -140,6 +147,18 @@
 			</div>
 		</div>
 	</div>
+
+	@if ($esInterno)
+		{{-- Esta pantalla enseña el gasto de plataforma, que el cliente no debe
+		     ver nunca. El aviso se imprime también en el PDF a propósito. --}}
+		<div class="interno">
+			<div class="wrap">
+				<strong>Datos internos · no compartir con el cliente.</strong>
+				Las cifras de coste son el <strong>gasto real pagado a la plataforma</strong>, no lo que se factura.
+				<a href="{{ route('portal.dashboard') }}">Ver la vista del cliente →</a>
+			</div>
+		</div>
+	@endif
 
 	<div class="wrap" style="flex:1">
 		<div class="pagehead">
@@ -172,7 +191,7 @@
 				<h2>Evolución diaria</h2>
 				<div class="ctrls">
 					<select class="mini" id="metric">
-						<option value="c">Inversión</option>
+						<option value="c">{{ $etiquetaCoste }}</option>
 						<option value="k">Clics</option>
 						<option value="l">Leads</option>
 						<option value="i">Impresiones</option>
@@ -199,7 +218,7 @@
 					<tr id="thead">
 						<th class="no">Campaña</th>
 						<th class="no">Canal</th>
-						<th data-k="c">Inversión <span class="ar">▾</span></th>
+						<th data-k="c">{{ $etiquetaCoste }} <span class="ar">▾</span></th>
 						<th data-k="i">Impresiones <span class="ar">▾</span></th>
 						<th data-k="k">Clics <span class="ar">▾</span></th>
 						<th data-k="l">Leads <span class="ar">▾</span></th>
@@ -229,6 +248,9 @@
 
 	<script>
 	const DATA = @json($data);
+	{{-- Comentario de Blade, NO de JavaScript: lo que se escribe con // viaja al
+	     navegador del cliente, y aquí se habla de la vista interna. --}}
+	const LBL_COSTE = @json($etiquetaCoste);
 
 	const CH = {
 		meta:   {name:'Meta Ads',   color:'#1877F2', logo:'<svg viewBox="0 0 36 22" fill="none"><path d="M6 3C2.7 3 .5 6.4 .5 11S2.7 19 6 19c2.5 0 4.2-1.5 6.4-4.9C14.9 10.4 16.3 8 18 8s3.1 2.4 5.6 6.1C25.8 17.5 27.5 19 30 19c3.3 0 5.5-3.4 5.5-8S33.3 3 30 3c-2.5 0-4.2 1.5-6.4 4.9" stroke="#1877F2" stroke-width="3" stroke-linecap="round"/></svg>'},
@@ -267,7 +289,7 @@
 		let prev=null;
 		if(S.compare){const [pf,pt]=prevRange(S.from,S.to); prev=agg(rowsIn(pf,pt,S.channel));}
 		const defs=[
-			['Inversión', eur(cur.c), n0(cur.i)+' impresiones', 'c', false],
+			[LBL_COSTE, eur(cur.c), n0(cur.i)+' impresiones', 'c', false],
 			['CPC', eur(cur.cpc), n0(cur.k)+' clics', 'cpc', true],
 			['CPL', eur(cur.cpl), n0(cur.l)+' leads', 'cpl', true],
 			['CTR', (Math.round(cur.ctr*100)/100).toLocaleString('es-ES')+'%', 'clics / impresiones', 'ctr', false],
@@ -302,7 +324,7 @@
 			return `<div class="canal" style="border-top-color:${chColor(p)}">
 				<div class="canal__head"><span class="canal__logo">${CH[p]?.logo||''}</span><span class="canal__name">${chName(p)}</span></div>
 				<div class="canal__grid">
-					<div><div class="mini__label">Inversión</div><div class="mini__num g">${eur(a.c)}</div></div>
+					<div><div class="mini__label">${LBL_COSTE}</div><div class="mini__num g">${eur(a.c)}</div></div>
 					<div><div class="mini__label">Leads</div><div class="mini__num">${n0(a.l)}</div></div>
 					<div><div class="mini__label">CPC</div><div class="mini__num">${eur(a.cpc)}</div></div>
 					<div><div class="mini__label">CPL</div><div class="mini__num">${eur(a.cpl)}</div></div>
@@ -417,7 +439,7 @@
 	function downloadCSV(){
 		const rows=campaignRows();
 		const dec=v=>(Math.round(v*100)/100).toFixed(2).replace('.',',');
-		const head=['Campaña','Canal','Inversión','Impresiones','Clics','Leads','CPC','CPL'];
+		const head=['Campaña','Canal',LBL_COSTE,'Impresiones','Clics','Leads','CPC','CPL'];
 		const q=s=>'"'+String(s).replace(/"/g,'""')+'"';
 		const lines=[head.map(q).join(';')];
 		for(const o of rows){
