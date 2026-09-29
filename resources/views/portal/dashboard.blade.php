@@ -25,6 +25,13 @@
 		.vista{font-size:.75rem;color:var(--mut);border:1px solid #d9e2dc;border-radius:999px;padding:3px 9px;white-space:nowrap}
 		.interno{background:#7a2020;color:#fff;padding:10px 0;font-size:.9rem}
 		.interno a{color:#fff;margin-left:8px}
+		.medidores{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px;margin-bottom:8px}
+		.med{background:#fff;border:1px solid var(--border);border-radius:14px;padding:16px;text-align:center}
+		.med__name{font-weight:700;font-size:.95rem;margin-bottom:6px}
+		.med svg{width:100%;max-width:190px;height:auto}
+		.med__num{font-size:1.25rem;font-weight:800;margin-top:-6px}
+		.med__sub{font-size:.8rem;color:var(--mut);margin-top:2px}
+		.med__sub.over{color:#a13030;font-weight:700}
 		.pagehead{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:clamp(22px,3vw,32px) 0 18px}
 		.exports{display:flex;gap:8px}
 		.xbtn{border:1.4px solid var(--border);background:#fff;border-radius:10px;padding:8px 14px;font-size:.86rem;font-weight:700;color:var(--green-dark);cursor:pointer}
@@ -190,11 +197,19 @@
 			<div class="card__head">
 				<h2>Evolución diaria</h2>
 				<div class="ctrls">
+					<select class="mini" id="groupBy">
+						<option value="canal">Por canal</option>
+						<option value="linea">Por línea</option>
+					</select>
 					<select class="mini" id="metric">
 						<option value="c">{{ $etiquetaCoste }}</option>
 						<option value="k">Clics</option>
 						<option value="l">Leads</option>
 						<option value="i">Impresiones</option>
+						<option value="cpl">CPL</option>
+						<option value="cpc">CPC</option>
+						<option value="cpm">CPM</option>
+						<option value="ctr">CTR</option>
 					</select>
 					<div class="ctrls" id="chartChips"></div>
 				</div>
@@ -204,6 +219,13 @@
 
 		<p class="eyebrow">Rendimiento por canal</p>
 		<div class="canales" id="canales"></div>
+
+		{{-- Consumo del objetivo del mes por línea. Se oculta entero si ninguna
+		     línea tiene presupuesto asignado, para no enseñar medidores vacíos. --}}
+		<div id="objetivosWrap" hidden>
+			<p class="eyebrow" id="objetivosTitulo">{{ $tituloObjetivos }}</p>
+			<div class="medidores" id="medidores"></div>
+		</div>
 
 		<div class="card">
 			<div class="card__head">
@@ -250,7 +272,8 @@
 	const DATA = @json($data);
 	{{-- Comentario de Blade, NO de JavaScript: lo que se escribe con // viaja al
 	     navegador del cliente, y aquí se habla de la vista interna. --}}
-	const LBL_COSTE = @json($etiquetaCoste);
+	const LBL_COSTE     = @json($etiquetaCoste);
+	const TIT_OBJETIVOS = @json($tituloObjetivos);
 
 	const CH = {
 		meta:   {name:'Meta Ads',   color:'#1877F2', logo:'<svg viewBox="0 0 36 22" fill="none"><path d="M6 3C2.7 3 .5 6.4 .5 11S2.7 19 6 19c2.5 0 4.2-1.5 6.4-4.9C14.9 10.4 16.3 8 18 8s3.1 2.4 5.6 6.1C25.8 17.5 27.5 19 30 19c3.3 0 5.5-3.4 5.5-8S33.3 3 30 3c-2.5 0-4.2 1.5-6.4 4.9" stroke="#1877F2" stroke-width="3" stroke-linecap="round"/></svg>'},
@@ -267,8 +290,28 @@
 	const iso = d => d.toISOString().slice(0,10);
 	const addDays = (s,n) => { const d=parse(s); d.setDate(d.getDate()+n); return iso(d); };
 
+	const pct = v => (Math.round(v*100)/100).toLocaleString('es-ES') + '%';
+
+	// Métricas del gráfico. Las derivadas (CPC, CPM, CTR…) NO se pueden sumar
+	// día a día: hay que acumular los crudos y dividir al final, o la media
+	// saldría mal. Por eso todas se declaran como cálculo sobre el acumulado.
+	const METRICAS = {
+		c:   {fmt:eur, calc:a=>a.c},
+		l:   {fmt:n0,  calc:a=>a.l},
+		k:   {fmt:n0,  calc:a=>a.k},
+		i:   {fmt:n0,  calc:a=>a.i},
+		cpl: {fmt:eur, calc:a=>a.l?a.c/a.l:0},
+		cpc: {fmt:eur, calc:a=>a.k?a.c/a.k:0},
+		cpm: {fmt:eur, calc:a=>a.i?a.c/a.i*1000:0},
+		ctr: {fmt:pct, calc:a=>a.i?a.k/a.i*100:0},
+	};
+
+	// Paleta para las series por línea (los canales ya tienen color de marca).
+	const PALETA = ['#638E76','#C2703D','#3D6FC2','#B23A6B','#8A6FBF','#3F8F8A','#C2A03D','#9A5B3D'];
+	const colorLinea = (() => { const m={}; let n=0; return s => (m[s] = m[s] ?? PALETA[n++ % PALETA.length]); })();
+
 	const present = DATA.canales.slice();
-	const S = { from:DATA.min, to:DATA.max, compare:false, channel:'all', metric:'c',
+	const S = { from:DATA.min, to:DATA.max, compare:false, channel:'all', metric:'c', groupBy:'canal',
 		chartCh:Object.fromEntries(present.map(p=>[p,true])), q:'', sort:'c', dir:'desc', per:25, page:1 };
 
 	function rowsIn(from,to,channel){
@@ -340,26 +383,116 @@
 		el.querySelectorAll('.chip').forEach(ch=>ch.onclick=()=>{const p=ch.dataset.ch;S.chartCh[p]=!S.chartCh[p];renderChartChips();renderChart();});
 	}
 
+	// Cuántas líneas como mucho en el gráfico: con más, deja de leerse. El resto
+	// se agrupa en "Otras" para que los totales sigan cuadrando.
+	const MAX_SERIES = 8;
+
+	function acumuladoPorSerie(dates){
+		const acc = {};
+		for(const r of DATA.rows){
+			if(r.f<S.from || r.f>S.to) continue;
+			if(S.channel!=='all' ? r.p!==S.channel : !S.chartCh[r.p]) continue;
+			const serie = S.groupBy==='linea' ? r.camp : r.p;
+			const porFecha = acc[serie] = acc[serie] || {};
+			const o = porFecha[r.f] = porFecha[r.f] || {c:0,k:0,l:0,i:0};
+			o.c+=r.c; o.k+=r.k; o.l+=r.l; o.i+=r.i;
+		}
+		if(S.groupBy!=='linea') return acc;
+
+		// Se ordenan por coste y las sobrantes se funden en una sola serie.
+		const total = s => Object.values(acc[s]).reduce((t,o)=>t+o.c,0);
+		const orden = Object.keys(acc).sort((a,b)=>total(b)-total(a));
+		if(orden.length<=MAX_SERIES) return acc;
+		const salen = orden.slice(MAX_SERIES);
+		const otras = {};
+		for(const s of salen){
+			for(const [f,o] of Object.entries(acc[s])){
+				const d = otras[f] = otras[f] || {c:0,k:0,l:0,i:0};
+				d.c+=o.c; d.k+=o.k; d.l+=o.l; d.i+=o.i;
+			}
+			delete acc[s];
+		}
+		acc['Otras ('+salen.length+')'] = otras;
+		return acc;
+	}
+
 	let chart=null;
 	function renderChart(){
 		const from=parse(S.from), to=parse(S.to);
 		const labels=[]; const dates=[];
 		for(let d=new Date(from); d<=to; d.setDate(d.getDate()+1)){const s=iso(d);dates.push(s);labels.push(s.slice(8,10)+'/'+s.slice(5,7));}
-		const chans = present.filter(p=> (S.channel==='all'? S.chartCh[p] : p===S.channel));
-		const metric=S.metric;
-		const datasets = chans.map(p=>{
-			const byDate=Object.fromEntries(dates.map(s=>[s,0]));
-			for(const r of DATA.rows){if(r.p===p && byDate[r.f]!==undefined) byDate[r.f]+=r[metric];}
-			return {label:chName(p), data:dates.map(s=>Math.round(byDate[s]*100)/100), borderColor:chColor(p), backgroundColor:chColor(p),
-				tension:.3, borderWidth:2.4, pointRadius:0, fill:false};
+
+		const M = METRICAS[S.metric] || METRICAS.c;
+		const acc = acumuladoPorSerie(dates);
+		const porLinea = S.groupBy==='linea';
+		const vacio = {c:0,k:0,l:0,i:0};
+
+		const series = Object.keys(acc).sort((a,b)=>{
+			const t = s => Object.values(acc[s]).reduce((x,o)=>x+o.c,0);
+			return t(b)-t(a);
 		});
-		const isEur = metric==='c';
+
+		const datasets = series.map(s=>{
+			const color = porLinea ? colorLinea(s) : chColor(s);
+			return {
+				label: porLinea ? s : chName(s),
+				data: dates.map(f=>Math.round(M.calc(acc[s][f]||vacio)*100)/100),
+				borderColor:color, backgroundColor:color,
+				tension:.3, borderWidth:2.4, pointRadius:0, fill:false,
+			};
+		});
+
 		if(chart) chart.destroy();
 		chart=new Chart(document.getElementById('chart'),{type:'line',data:{labels,datasets},options:{
 			responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
-			plugins:{legend:{position:'bottom'},tooltip:{callbacks:{label:c=>c.dataset.label+': '+(isEur?eur(c.parsed.y):n0(c.parsed.y))}}},
-			scales:{y:{beginAtZero:true,grid:{color:'#f0eeec'},ticks:{callback:v=>isEur?eur(v):n0(v)}},x:{grid:{display:false}}}
+			plugins:{legend:{position:'bottom'},tooltip:{callbacks:{label:c=>c.dataset.label+': '+M.fmt(c.parsed.y)}}},
+			scales:{y:{beginAtZero:true,grid:{color:'#f0eeec'},ticks:{callback:v=>M.fmt(v)}},x:{grid:{display:false}}}
 		}});
+	}
+
+	// Medidores de consumo del objetivo del mes, por línea.
+	// El objetivo es MENSUAL, así que se toma el mes en el que acaba el rango
+	// elegido: comparar siete días contra un objetivo de mes no diría nada.
+	function renderMedidores(){
+		const wrap = document.getElementById('objetivosWrap');
+		const objetivos = DATA.objetivos || {};
+		const mes = S.to.slice(0,7);
+
+		const gastado = {};
+		for(const r of DATA.rows){
+			if(r.f.slice(0,7)!==mes) continue;
+			if(S.channel!=='all' && r.p!==S.channel) continue;
+			gastado[r.camp] = (gastado[r.camp]||0) + r.c;
+		}
+
+		const items = Object.keys(objetivos)
+			.map(camp=>({camp, obj:(objetivos[camp]||{})[mes]||0, val:gastado[camp]||0}))
+			.filter(o=>o.obj>0)
+			.sort((a,b)=>b.obj-a.obj);
+
+		if(!items.length){ wrap.hidden = true; return; }
+		wrap.hidden = false;
+
+		const [a,m] = mes.split('-');
+		const nombreMes = new Date(a, m-1, 1).toLocaleDateString('es-ES',{month:'long',year:'numeric'});
+		document.getElementById('objetivosTitulo').textContent = TIT_OBJETIVOS + ' · ' + nombreMes;
+
+		document.getElementById('medidores').innerHTML = items.map(o=>{
+			const frac = o.obj? o.val/o.obj : 0;
+			const pasado = frac>1;
+			const color = pasado ? '#a13030' : colorLinea(o.camp);
+			const largo = Math.PI*52;                       // longitud del semicírculo
+			const pintado = Math.min(frac,1)*largo;
+			return `<div class="med">
+				<div class="med__name">${o.camp}</div>
+				<svg viewBox="0 0 120 74" role="img" aria-label="${o.camp}: ${eur(o.val)} de ${eur(o.obj)}">
+					<path d="M8 60 A52 52 0 0 1 112 60" fill="none" stroke="#e7e2de" stroke-width="12" stroke-linecap="round"/>
+					<path d="M8 60 A52 52 0 0 1 112 60" fill="none" stroke="${color}" stroke-width="12" stroke-linecap="round" stroke-dasharray="${pintado} ${largo}"/>
+				</svg>
+				<div class="med__num">${eur(o.val)}</div>
+				<div class="med__sub ${pasado?'over':''}">${Math.round(frac*100)}% de ${eur(o.obj)}</div>
+			</div>`;
+		}).join('');
 	}
 
 	function campaignRows(){
@@ -404,7 +537,7 @@
 		el.querySelectorAll('button').forEach(b=>b.onclick=()=>{S.channel=b.dataset.c;S.page=1;renderChanFilter();renderAll();});
 	}
 
-	function renderAll(){renderKPIs();renderChannels();renderChart();renderTable();}
+	function renderAll(){renderKPIs();renderChannels();renderMedidores();renderChart();renderTable();}
 
 	// Presets
 	function applyPreset(p){
@@ -430,6 +563,7 @@
 	document.getElementById('to').onchange=e=>{S.to=e.target.value;S.page=1;renderAll();};
 	document.getElementById('compare').onchange=e=>{S.compare=e.target.checked;renderKPIs();};
 	document.getElementById('metric').onchange=e=>{S.metric=e.target.value;renderChart();};
+	document.getElementById('groupBy').onchange=e=>{S.groupBy=e.target.value;renderChart();};
 	document.getElementById('search').oninput=e=>{S.q=e.target.value;S.page=1;renderTable();};
 	document.getElementById('perpage').onchange=e=>{S.per=parseInt(e.target.value,10);S.page=1;renderTable();};
 	document.querySelectorAll('#thead th[data-k]').forEach(th=>th.onclick=()=>{

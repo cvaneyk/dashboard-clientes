@@ -67,7 +67,9 @@ class DashboardController extends Controller
 
         $cliente = $this->clienteSeleccionado($request, $visibles);
 
-        $lineas = $cliente->lineas()->where('activo', true)->get();
+        // Con los presupuestos cargados: los necesitan los medidores de objetivo
+        // y sin esto sería una consulta por línea.
+        $lineas = $cliente->lineas()->where('activo', true)->with('presupuestoEventos')->get();
 
         // Ventana temporal = rango de fechas con datos del cliente.
         $min = MetricaDiaria::where('cliente_id', $cliente->id)->min('fecha');
@@ -159,6 +161,30 @@ class DashboardController extends Controller
 
         $canales = array_values(array_unique(array_map(fn ($r) => $r['p'], $rows)));
 
+        // Objetivo facturable por línea y mes, para los medidores de consumo.
+        // Se agrupa por el mismo nombre que las filas (producto si lo tiene),
+        // así que varias campañas de un mismo producto suman su objetivo.
+        // Va SIEMPRE el objetivo del cliente, también en la vista interna:
+        // ahí el medidor enseña gasto real contra lo facturado, que es el margen.
+        $objetivos = [];
+        foreach ($lineas as $linea) {
+            $nombre = $linea->producto ?: $linea->nombre;
+
+            foreach ($meses as [$y, $m]) {
+                $evento = $linea->eventoVigente(Carbon::create($y, $m, 1)->endOfMonth());
+
+                if (! $evento || $evento->estado === 'pausada') {
+                    continue;
+                }
+
+                $clave = sprintf('%04d-%02d', $y, $m);
+                $objetivos[$nombre][$clave] = round(
+                    ($objetivos[$nombre][$clave] ?? 0) + (float) $evento->objetivo_mes,
+                    2
+                );
+            }
+        }
+
         // Logo: si es una URL completa, se usa tal cual; si es un archivo subido,
         // se sirve por nuestra ruta propia (no depende de storage:link).
         $logoUrl = null;
@@ -169,9 +195,10 @@ class DashboardController extends Controller
         }
 
         $data = [
-            'rows'     => $rows,
-            'canales'  => $canales,
-            'nombres'  => self::CANALES,
+            'rows'      => $rows,
+            'canales'   => $canales,
+            'objetivos' => $objetivos,
+            'nombres'   => self::CANALES,
             'min'      => $ini->toDateString(),
             'max'      => $fin->toDateString(),
             'cliente'  => $cliente->nombre,
@@ -187,7 +214,13 @@ class DashboardController extends Controller
             'esInterno'     => $interno,
             // Que el número diga lo que es: confundir las dos cifras en una
             // captura de pantalla es justo el riesgo de esta vista.
-            'etiquetaCoste' => $interno ? 'Gasto real' : 'Inversión',
+            //
+            // Estos textos SE PASAN desde aquí en vez de escribirse en el JS:
+            // el JavaScript es el mismo para las dos vistas y viaja entero al
+            // navegador, así que un literal "gasto real" dentro le contaría al
+            // cliente que existe una vista interna.
+            'etiquetaCoste'    => $interno ? 'Gasto real' : 'Inversión',
+            'tituloObjetivos'  => $interno ? 'Consumo sobre objetivo' : 'Objetivo del mes',
         ]);
     }
 
