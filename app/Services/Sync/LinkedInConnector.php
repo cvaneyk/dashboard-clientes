@@ -43,6 +43,9 @@ class LinkedInConnector implements Conector
         return (string) config('services.linkedin_ads.scopes', 'r_ads r_ads_reporting');
     }
 
+    /** Campañas ya descargadas en esta sincronización, por id de cuenta. */
+    private array $campanasPorCuenta = [];
+
     public function __construct(private CampaignImporter $importer)
     {
     }
@@ -122,7 +125,7 @@ class LinkedInConnector implements Conector
 
         // Una conexión que no lee nada no sirve: se comprueba al conectar para
         // que el error salga aquí y no en la sincronización de madrugada.
-        $this->campanas($cuenta, $conexion, []);
+        $this->campanas($cuenta, $conexion);
 
         return $conexion;
     }
@@ -224,14 +227,7 @@ class LinkedInConnector implements Conector
         $elementos = $this->analytics($cuenta, $conexion, $desde, $hasta);
 
         // adAnalytics solo da URNs: los nombres van en otra llamada.
-        $ids = [];
-        foreach ($elementos as $e) {
-            if ($id = $this->idCampana($e)) {
-                $ids[$id] = true;
-            }
-        }
-
-        $nombres = $this->campanas($cuenta, $conexion, array_keys($ids));
+        $nombres = $this->campanas($cuenta, $conexion);
         $tipos   = $this->tiposConversion($cuenta);
         $out     = [];
 
@@ -276,7 +272,7 @@ class LinkedInConnector implements Conector
 
         $tocadas = 0;
 
-        foreach ($this->campanas($cuenta, $conexion, []) as $campana) {
+        foreach ($this->campanas($cuenta, $conexion) as $campana) {
             $linea = $lineas->get(Linea::normalizar($campana['nombre']));
 
             if (! $linea || $campana['importe'] === null) {
@@ -327,25 +323,39 @@ class LinkedInConnector implements Conector
     }
 
     /**
-     * Nombres y presupuestos de las campañas. Con $ids resuelve solo esas; sin
-     * ellos, trae las de la cuenta (que es lo que necesita el presupuesto).
+     * Nombres y presupuestos de las campañas de la cuenta, indexados por id.
      *
-     * @param  array<int,string>  $ids
+     * Se piden todas de una vez y se guardan en memoria: durante una
+     * sincronización hacen falta dos veces (para resolver los nombres de las
+     * métricas y para los presupuestos) y no tiene sentido bajarlas dos veces.
+     *
      * @return array<string,array{nombre:string,importe:?float,tipo:?string}>
      */
-    private function campanas(Cuenta $cuenta, ConexionApi $conexion, array $ids): array
+    private function campanas(Cuenta $cuenta, ConexionApi $conexion): array
     {
-        $cuentaUrn = 'urn:li:sponsoredAccount:' . $this->cuentaExternaId($cuenta);
+        $cuentaId = $this->cuentaExternaId($cuenta);
 
-        $url = $ids === []
-            ? 'https://api.linkedin.com/rest/adCampaigns?q=search&search=(account:(values:List('
-                . rawurlencode($cuentaUrn) . ')))'
-            : 'https://api.linkedin.com/rest/adCampaigns?ids=List(' . implode(',', $ids) . ')';
+        return $this->campanasPorCuenta[$cuentaId] ??= $this->descargarCampanas($cuentaId, $conexion);
+    }
 
-        $resp = $this->get($url, $conexion);
+    /**
+     * @return array<string,array{nombre:string,importe:?float,tipo:?string}>
+     */
+    private function descargarCampanas(string $cuentaId, ConexionApi $conexion): array
+    {
+        // Los endpoints de campaña cuelgan de la cuenta desde que LinkedIn los
+        // movió: /rest/adAccounts/{id}/adCampaigns. El /rest/adCampaigns suelto
+        // ya no existe y responde con un error explicándolo.
+        //
+        // 'count' va explícito porque LinkedIn pagina de diez en diez por
+        // defecto: sin él solo llegarían las diez primeras campañas y el resto
+        // se quedaría sin nombre.
+        $url = sprintf(
+            'https://api.linkedin.com/rest/adAccounts/%s/adCampaigns?q=search&count=1000',
+            $cuentaId
+        );
 
-        // La búsqueda devuelve 'elements'; la consulta por ids, 'results'.
-        $campanas = $resp['elements'] ?? array_values((array) ($resp['results'] ?? []));
+        $campanas = (array) ($this->get($url, $conexion)['elements'] ?? []);
 
         $out = [];
 

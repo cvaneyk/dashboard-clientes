@@ -219,6 +219,55 @@ class LinkedInConnectorTest extends TestCase
         $this->assertSame(0, PresupuestoEvento::count());
     }
 
+    /**
+     * LinkedIn movió los endpoints de campaña bajo la cuenta: el /rest/adCampaigns
+     * suelto ya no existe. Y 'count' va explícito porque pagina de diez en diez
+     * por defecto, lo que dejaría sin nombre a todas las campañas menos diez.
+     */
+    public function test_pide_las_campanas_al_endpoint_anidado_en_la_cuenta(): void
+    {
+        $cuenta = $this->cuentaLinkedin(externalId: '512345');
+        $this->conexion($cuenta);
+
+        $this->fakeLinkedin(
+            elementos: [$this->elemento('777', '2026-04-01')],
+            campanas: [['id' => '777', 'name' => 'MASTER - LEADGEN']]
+        );
+
+        app(LinkedInConnector::class)->sincronizarRango($cuenta, '2026-04-01', '2026-04-01');
+
+        Http::assertSent(function ($request) {
+            if (! str_contains($request->url(), 'adCampaigns')) {
+                return true;
+            }
+
+            return str_contains($request->url(), '/rest/adAccounts/512345/adCampaigns')
+                && str_contains($request->url(), 'count=');
+        });
+    }
+
+    /** Las campañas se usan dos veces por sincronización; basta con bajarlas una. */
+    public function test_no_baja_las_campanas_dos_veces_en_la_misma_sincronizacion(): void
+    {
+        $cuenta = $this->cuentaLinkedin();
+        $this->conexion($cuenta);
+
+        $llamadas = 0;
+        Http::fake(function ($request) use (&$llamadas) {
+            if (str_contains($request->url(), 'adCampaigns')) {
+                $llamadas++;
+
+                return Http::response(['elements' => [['id' => '777', 'name' => 'MASTER - LEADGEN']]]);
+            }
+
+            return Http::response(['elements' => [$this->elemento('777', '2026-04-01')]]);
+        });
+
+        app(LinkedInConnector::class)->sincronizarRango($cuenta, '2026-04-01', '2026-04-01');
+
+        $this->assertSame(1, $llamadas);
+    }
+
     public function test_manda_la_version_de_api_y_el_protocolo(): void
     {
         $cuenta = $this->cuentaLinkedin();
