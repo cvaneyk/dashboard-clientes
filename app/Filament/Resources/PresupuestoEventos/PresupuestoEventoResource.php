@@ -20,7 +20,7 @@ class PresupuestoEventoResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
 
-    protected static ?string $recordTitleAttribute = 'objetivo_mes';
+    protected static ?string $recordTitleAttribute = 'porcentaje';
 
     protected static ?string $modelLabel = 'Presupuesto';
 

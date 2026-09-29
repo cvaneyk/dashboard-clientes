@@ -55,8 +55,8 @@ class DashboardInternoTest extends TestCase
         // Se le factura 3.100 €/mes y a la plataforma se le pagan 40 €/día.
         PresupuestoEvento::create([
             'linea_id'       => $linea->id,
-            'fecha_efectiva' => now()->startOfMonth()->toDateString(),
-            'objetivo_mes'   => 3100,
+            'desde'          => now()->startOfMonth()->toDateString(),
+            'porcentaje'     => 25,
             'estado'         => 'activa',
         ]);
 

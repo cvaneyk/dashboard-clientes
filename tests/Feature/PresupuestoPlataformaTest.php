@@ -19,7 +19,7 @@ use Tests\TestCase;
  * Presupuesto de plataforma: el tope de gasto que tiene la campaña EN META,
  * guardado como referencia interna para el account manager.
  *
- * Lo que se factura al cliente sigue siendo presupuesto_eventos.objetivo_mes y
+ * Lo que se factura al cliente sale del porcentaje de presupuesto_eventos y
  * se decide a mano: estos tests fijan precisamente que lo de Meta no se cuela
  * ahí ni llega al dashboard.
  */
@@ -204,13 +204,13 @@ class PresupuestoPlataformaTest extends TestCase
 
         PresupuestoEvento::create([
             'linea_id'       => $con->id,
-            'fecha_efectiva' => now()->startOfMonth()->toDateString(),
-            'objetivo_mes'   => 1200,
+            'desde'          => now()->startOfMonth()->toDateString(),
+            'porcentaje'     => 20,
             'estado'         => 'activa',
         ]);
 
         $this->assertNull($sin->eventoVigente());
-        $this->assertEquals(1200, $con->eventoVigente()->objetivo_mes);
+        $this->assertEquals(20, $con->eventoVigente()->porcentaje);
 
         $admin = User::create([
             'name'     => 'Admin',
@@ -222,7 +222,7 @@ class PresupuestoPlataformaTest extends TestCase
         $this->actingAs($admin, 'admin')
             ->get('/admin/lineas')
             ->assertSuccessful()
-            ->assertSee('Sin presupuesto');
+            ->assertSee('Sin tramo');
     }
 
     public function test_la_accion_masiva_asigna_el_objetivo_a_varias_lineas(): void
@@ -242,26 +242,26 @@ class PresupuestoPlataformaTest extends TestCase
 
         Livewire::test(ListLineas::class)
             ->callTableBulkAction('asignar_objetivo', [$una, $otra], [
-                'fecha_efectiva' => now()->startOfMonth()->toDateString(),
-                'objetivo_mes'   => 1200,
+                'desde'          => now()->startOfMonth()->toDateString(),
+                'porcentaje'     => 20,
                 'estado'         => 'activa',
             ])
             ->assertHasNoTableBulkActionErrors();
 
         $this->assertSame(2, PresupuestoEvento::count());
-        $this->assertEquals(1200, $una->refresh()->eventoVigente()->objetivo_mes);
-        $this->assertEquals(1200, $otra->refresh()->eventoVigente()->objetivo_mes);
+        $this->assertEquals(20, $una->refresh()->eventoVigente()->porcentaje);
+        $this->assertEquals(20, $otra->refresh()->eventoVigente()->porcentaje);
 
         // Repetirla con la misma fecha corrige el evento, no lo duplica.
         Livewire::test(ListLineas::class)
             ->callTableBulkAction('asignar_objetivo', [$una], [
-                'fecha_efectiva' => now()->startOfMonth()->toDateString(),
-                'objetivo_mes'   => 1500,
+                'desde'          => now()->startOfMonth()->toDateString(),
+                'porcentaje'     => 35,
                 'estado'         => 'activa',
             ]);
 
         $this->assertSame(2, PresupuestoEvento::count());
-        $this->assertEquals(1500, $una->refresh()->eventoVigente()->objetivo_mes);
+        $this->assertEquals(35, $una->refresh()->eventoVigente()->porcentaje);
     }
 
     public function test_un_evento_futuro_no_cuenta_como_presupuesto_vigente(): void
@@ -271,8 +271,8 @@ class PresupuestoPlataformaTest extends TestCase
 
         PresupuestoEvento::create([
             'linea_id'       => $linea->id,
-            'fecha_efectiva' => now()->addMonth()->startOfMonth()->toDateString(),
-            'objetivo_mes'   => 900,
+            'desde'          => now()->addMonth()->startOfMonth()->toDateString(),
+            'porcentaje'     => 30,
             'estado'         => 'activa',
         ]);
 
@@ -287,12 +287,12 @@ class PresupuestoPlataformaTest extends TestCase
         foreach ([[now()->startOfMonth(), 1000], [now()->subDays(2), 1600]] as [$fecha, $importe]) {
             PresupuestoEvento::create([
                 'linea_id'       => $linea->id,
-                'fecha_efectiva' => $fecha->toDateString(),
-                'objetivo_mes'   => $importe,
+                'desde'          => $fecha->toDateString(),
+                'porcentaje'     => $importe,
                 'estado'         => 'activa',
             ]);
         }
 
-        $this->assertEquals(1600, $linea->eventoVigente()->objetivo_mes);
+        $this->assertEquals(1600, $linea->eventoVigente()->porcentaje);
     }
 }

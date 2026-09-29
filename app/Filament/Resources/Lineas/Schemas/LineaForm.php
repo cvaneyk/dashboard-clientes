@@ -85,18 +85,33 @@ class LineaForm
                     ->visible(fn (?Linea $record) => $record !== null)
                     ->columnSpanFull(),
 
+                // Secundario a propósito: lo normal es asignar tramos en bloque
+                // desde el listado de Líneas. Esto queda para ver qué tiene
+                // puesta una línea y para corregir casos sueltos.
                 Repeater::make('presupuestoEventos')
                     ->relationship()
-                    ->label('Presupuesto del mes y cambios (subir / bajar / pausar)')
-                    ->helperText('Cada fila es un cambio con su fecha. El objetivo es lo que se factura al cliente ese mes; el sistema lo reparte por días.')
+                    ->label('Tramos de presupuesto')
+                    ->helperText('Cada tramo aplica un porcentaje sobre el gasto real de la plataforma entre esas dos fechas. Si se solapan, manda el que empieza más tarde.')
+                    ->collapsed()
+                    ->itemLabel(fn (array $state): ?string => trim(
+                        ($state['desde'] ?? '?') . ' → ' . ($state['hasta'] ?? 'sin fin')
+                        . '  ·  +' . ($state['porcentaje'] ?? 0) . '%'
+                        . ($state['estado'] === 'pausada' ? '  · PAUSADA' : '')
+                    ))
                     ->schema([
-                        DatePicker::make('fecha_efectiva')
-                            ->label('Desde (fecha)')
+                        DatePicker::make('desde')
+                            ->label('Desde')
                             ->required(),
-                        TextInput::make('objetivo_mes')
-                            ->label('Objetivo cliente del mes (€)')
+                        DatePicker::make('hasta')
+                            ->label('Hasta (vacío = sin fin)')
+                            ->afterOrEqual('desde'),
+                        TextInput::make('porcentaje')
+                            ->label('Porcentaje sobre el gasto (%)')
                             ->numeric()
-                            ->required(),
+                            ->minValue(0)
+                            ->suffix('%')
+                            ->required()
+                            ->helperText('25 = al cliente se le factura el gasto real más un 25 %.'),
                         Select::make('estado')
                             ->label('Estado')
                             ->options([
@@ -106,10 +121,11 @@ class LineaForm
                             ->default('activa')
                             ->required(),
                         TextInput::make('nota')
-                            ->label('Nota (opcional)'),
+                            ->label('Nota (opcional)')
+                            ->columnSpanFull(),
                     ])
                     ->columns(2)
-                    ->defaultItems(1)
+                    ->defaultItems(0)
                     ->columnSpanFull(),
             ]);
     }

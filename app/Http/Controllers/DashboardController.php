@@ -161,29 +161,12 @@ class DashboardController extends Controller
 
         $canales = array_values(array_unique(array_map(fn ($r) => $r['p'], $rows)));
 
-        // Objetivo facturable por línea y mes, para los medidores de consumo.
-        // Se agrupa por el mismo nombre que las filas (producto si lo tiene),
-        // así que varias campañas de un mismo producto suman su objetivo.
-        // Va SIEMPRE el objetivo del cliente, también en la vista interna:
-        // ahí el medidor enseña gasto real contra lo facturado, que es el margen.
+        // Los medidores de consumo quedaron sin sentido al pasar la facturación
+        // a porcentaje sobre el gasto: ya no hay objetivo mensual contra el que
+        // medir. Se manda vacío para que la sección no se pinte; el bloque se
+        // conserva por si se reaprovecha contra el tope de plataforma en la
+        // vista interna, donde sí está permitido enseñar datos de plataforma.
         $objetivos = [];
-        foreach ($lineas as $linea) {
-            $nombre = $linea->producto ?: $linea->nombre;
-
-            foreach ($meses as [$y, $m]) {
-                $evento = $linea->eventoVigente(Carbon::create($y, $m, 1)->endOfMonth());
-
-                if (! $evento || $evento->estado === 'pausada') {
-                    continue;
-                }
-
-                $clave = sprintf('%04d-%02d', $y, $m);
-                $objetivos[$nombre][$clave] = round(
-                    ($objetivos[$nombre][$clave] ?? 0) + (float) $evento->objetivo_mes,
-                    2
-                );
-            }
-        }
 
         // Logo: si es una URL completa, se usa tal cual; si es un archivo subido,
         // se sirve por nuestra ruta propia (no depende de storage:link).

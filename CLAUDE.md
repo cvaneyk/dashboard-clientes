@@ -11,25 +11,32 @@ estado, roadmap) y [docs/DESPLIEGUE.md](docs/DESPLIEGUE.md) (flujo de despliegue
 
 ## 1. La regla de negocio que manda sobre todo: el motor de precios
 
-**El coste que ve el cliente NO es el gasto real de la plataforma.** Es el objetivo mensual
-(lo que se le factura) repartido por días:
+Al cliente se le factura **el gasto real de la plataforma más un porcentaje**:
 
 ```
-coste_del_dia = (objetivo_mes − acumulado_hasta_ayer) / días_restantes_del_mes
+coste_cliente_dia = gasto_real_dia × (1 + porcentaje/100)
 ```
 
-Implementado en [app/Services/PricingEngine.php](app/Services/PricingEngine.php). Absorbe
-prorrateo diario, subir/bajar el objetivo a mitad de mes (renivela solo los días que quedan),
-pausar una línea (0 €/día desde la pausa), línea que arranca a mitad de mes y mover presupuesto
-entre líneas.
+Implementado en [app/Services/PricingEngine.php](app/Services/PricingEngine.php).
+
+> **Cambio de modelo (sept. 2026).** Antes el coste era un *objetivo mensual* prorrateado por días
+> y estaba desacoplado del gasto. Ahora sigue al gasto real. Ya **no hay objetivo mensual,
+> prorrateo ni renivelado**: si un día no se gasta, ese día no se factura. El histórico anterior
+> quedó a 0 € hasta que se le creen tramos, y se asumió a propósito.
 
 Reglas derivadas, **no romper ninguna**:
 
-- El coste-cliente **no se persiste**: se calcula al vuelo. Cambiar un presupuesto recalcula todo
-  el histórico sin migrar datos. No añadas una columna `coste_cliente` a `metricas_diarias`.
-- Los cambios de presupuesto se modelan como **eventos** en `presupuesto_eventos`
-  (`fecha_efectiva`, `objetivo_mes`, `estado` = `activa|pausada`). Para cada día el motor toma el
-  último evento vigente. Nunca edites "el presupuesto" en sitio: añade un evento.
+- El coste-cliente **no se persiste**: se calcula al vuelo. Cambiar un porcentaje recalcula todo el
+  periodo que cubre sin migrar datos. No añadas una columna `coste_cliente` a `metricas_diarias`.
+- El margen vive en **tramos** en `presupuesto_eventos` (`desde`, `hasta` nullable = sin fin,
+  `porcentaje`, `estado` = `activa|pausada`). La tabla conserva el nombre por historia, pero sus
+  filas ya no son eventos puntuales: son intervalos.
+- **Día fuera de todo tramo → 0 €.** No hay margen que aplicar, así que no se factura.
+- **Si dos tramos se solapan, gana el que empieza más tarde.** Corregir el margen se hace añadiendo
+  un tramo encima, no editando el anterior: así se conserva el histórico.
+- Lo normal es asignar tramos **en bloque** desde `/admin → Líneas` (filtros por cliente, cuenta y
+  plataforma + acción masiva "Asignar tramo de facturación"). El repetidor de la ficha de cada
+  línea queda plegado, para consultar y para casos sueltos.
 - `gasto_real` (lo que se paga a la plataforma) es **solo uso interno / margen**.
   **Nunca debe aparecer en ninguna vista del cliente.**
 - `lineas.presupuesto_plataforma` (el tope de gasto de la campaña en Meta, que trae la API) es de
@@ -153,7 +160,8 @@ hay que crear `app/Filament/Resources/Overrides/`.
 - `lineas` — campaña/adset presupuestada; `match_key` normalizada, `nivel` (`campania|adset`).
   `presupuesto_plataforma` (+ `_tipo` `diario|total`, `_nivel` `campania|adsets`, `_actualizado_en`)
   es el tope en la plataforma, **referencia interna** que refresca la sincronización.
-- `presupuesto_eventos` — línea temporal del objetivo mensual (la flexibilidad vive aquí).
+- `presupuesto_eventos` — **tramos** de facturación: `desde`, `hasta` (null = sin fin), `porcentaje`
+  sobre el gasto real, `estado`. Pese al nombre, son intervalos, no eventos puntuales.
 - `metricas_diarias` — cifras **reales** por día y línea. **Único por `(cuenta_id, match_key, fecha)`**
   → es lo que permite el upsert idempotente. Guarda `import_id`. El cast de `fecha` es
   `date:Y-m-d` **a propósito**: con `date` se escribía `Y-m-d H:i:s` y el upsert dejaba de casar
@@ -357,7 +365,7 @@ con logos SVG inline, tabla de campañas con borde de color por canal, export CS
 - **Una línea sin presupuesto del mes muestra inversión/CPC/CPL a 0.** Clics, leads e impresiones
   reales sí se ven. No es un bug: falta el evento de presupuesto en la ficha de la Línea. Como la
   sincronización crea líneas solas, en `/admin → Líneas` hay columna "Objetivo cliente", filtro
-  "Solo las que no tienen presupuesto" y acción masiva "Asignar objetivo del mes" para cazarlas.
+  "Solo las que no tienen tramo vigente" y acción masiva "Asignar tramo de facturación".
 
 ---
 

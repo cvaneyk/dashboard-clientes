@@ -16,11 +16,18 @@ class PresupuestoEventosTable
             ->columns([
                 TextColumn::make('linea.id')
                     ->searchable(),
-                TextColumn::make('fecha_efectiva')
-                    ->date()
+                TextColumn::make('desde')
+                    ->label('Desde')
+                    ->date('d/m/Y')
                     ->sortable(),
-                TextColumn::make('objetivo_mes')
-                    ->numeric()
+                TextColumn::make('hasta')
+                    ->label('Hasta')
+                    ->date('d/m/Y')
+                    ->placeholder('sin fin')
+                    ->sortable(),
+                TextColumn::make('porcentaje')
+                    ->label('Margen')
+                    ->formatStateUsing(fn ($state) => '+' . number_format((float) $state, 2, ',', '.') . ' %')
                     ->sortable(),
                 TextColumn::make('estado')
                     ->searchable(),

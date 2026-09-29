@@ -42,9 +42,13 @@ class Linea extends Model
     {
         $fecha ??= Carbon::now();
 
+        // Si dos tramos se solapan gana el que empieza más tarde (y a igualdad
+        // de fecha, el creado después): es lo que espera quien corrige un tramo
+        // añadiendo otro encima en vez de editar el anterior.
         return $this->presupuestoEventos
-            ->sortBy('fecha_efectiva')
-            ->last(fn (PresupuestoEvento $e) => $e->fecha_efectiva->lte($fecha));
+            ->filter(fn (PresupuestoEvento $t) => $t->cubre($fecha))
+            ->sortBy([['desde', 'asc'], ['id', 'asc']])
+            ->last();
     }
 
     /** Normaliza un nombre de campaña/adset para emparejar (quita emojis y espacios). */

@@ -63,8 +63,8 @@ class DashboardGraficosTest extends TestCase
         if ($objetivo !== null) {
             PresupuestoEvento::create([
                 'linea_id'       => $linea->id,
-                'fecha_efectiva' => now()->startOfMonth()->toDateString(),
-                'objetivo_mes'   => $objetivo,
+                'desde'          => now()->startOfMonth()->toDateString(),
+                'porcentaje'     => $objetivo,
                 'estado'         => 'activa',
             ]);
         }
@@ -95,71 +95,7 @@ class DashboardGraficosTest extends TestCase
         ]);
     }
 
-    public function test_el_objetivo_del_mes_viaja_al_navegador(): void
-    {
-        $this->linea('FISIO_LEADADS', 'Fisio', 600);
-        $mes = now()->format('Y-m');
-
-        $this->actingAs($this->admin(), 'admin')
-            ->get('/dashboard')
-            ->assertSuccessful()
-            ->assertSee('"objetivos":{"Fisio":{"' . $mes . '":600}', false);
-    }
-
-    /** Varias campañas del mismo producto son una sola barra: sus objetivos suman. */
-    public function test_las_campanas_de_un_mismo_producto_suman_su_objetivo(): void
-    {
-        $this->linea('FISIO_LEADADS', 'Fisio', 600);
-        $this->linea('FISIO_RETARGETING', 'Fisio', 400);
-        $mes = now()->format('Y-m');
-
-        $this->actingAs($this->admin(), 'admin')
-            ->get('/dashboard')
-            ->assertSuccessful()
-            ->assertSee('"Fisio":{"' . $mes . '":1000}', false);
-    }
-
-    public function test_una_linea_pausada_no_cuenta_para_el_objetivo(): void
-    {
-        $linea = $this->linea('PODO_LEADADS', 'Podologia', 700);
-
-        PresupuestoEvento::create([
-            'linea_id'       => $linea->id,
-            'fecha_efectiva' => now()->startOfMonth()->addDay()->toDateString(),
-            'objetivo_mes'   => 700,
-            'estado'         => 'pausada',
-        ]);
-
-        $this->actingAs($this->admin(), 'admin')
-            ->get('/dashboard')
-            ->assertSuccessful()
-            ->assertSee('"objetivos":[]', false);
-    }
-
-    public function test_sin_presupuesto_no_hay_medidores_que_pintar(): void
-    {
-        $this->linea('SIN_PRESUPUESTO', 'Suelta');
-
-        $this->actingAs($this->admin(), 'admin')
-            ->get('/dashboard')
-            ->assertSuccessful()
-            ->assertSee('"objetivos":[]', false);
-    }
-
-    /** En la vista interna el medidor compara gasto REAL con lo FACTURADO: eso es el margen. */
-    public function test_la_vista_interna_conserva_el_objetivo_facturado(): void
-    {
-        $this->linea('FISIO_LEADADS', 'Fisio', 600);
-        $mes = now()->format('Y-m');
-
-        $this->actingAs($this->admin(), 'admin')
-            ->get('/dashboard/interno')
-            ->assertSuccessful()
-            ->assertSee('"Fisio":{"' . $mes . '":600}', false)
-            ->assertSee('"c":50', false);
-    }
-
-    public function test_el_grafico_ofrece_agrupar_por_linea_y_las_metricas_derivadas(): void
+                        public function test_el_grafico_ofrece_agrupar_por_linea_y_las_metricas_derivadas(): void
     {
         $this->linea('FISIO_LEADADS', 'Fisio', 600);
 

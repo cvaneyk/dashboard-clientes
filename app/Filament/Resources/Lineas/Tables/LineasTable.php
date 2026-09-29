@@ -15,6 +15,7 @@ use Filament\Notifications\Notification;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -46,28 +47,28 @@ class LineasTable
                     ->badge()
                     ->toggleable(),
 
-                // Lo que se le factura al cliente: el objetivo vigente hoy.
-                // Sin él, esa campaña sale a 0 € en el dashboard del cliente.
+                // Margen que se aplica hoy. Sin tramo vigente, esa campaña sale
+                // a 0 € en el dashboard del cliente: no hay con qué facturarla.
                 TextColumn::make('objetivo')
-                    ->label('Objetivo cliente')
+                    ->label('Margen aplicado')
                     ->state(function (Linea $record): string {
-                        $evento = $record->eventoVigente();
+                        $tramo = $record->eventoVigente();
 
-                        if (! $evento) {
-                            return 'Sin presupuesto';
+                        if (! $tramo) {
+                            return 'Sin tramo';
                         }
 
-                        if ($evento->estado === 'pausada') {
+                        if ($tramo->estado === 'pausada') {
                             return 'Pausada';
                         }
 
-                        return number_format((float) $evento->objetivo_mes, 2, ',', '.') . ' € / mes';
+                        return '+' . number_format((float) $tramo->porcentaje, 2, ',', '.') . ' %';
                     })
                     ->badge()
                     ->color(fn (string $state) => match ($state) {
-                        'Sin presupuesto' => 'danger',
-                        'Pausada'         => 'warning',
-                        default           => 'success',
+                        'Sin tramo' => 'danger',
+                        'Pausada'   => 'warning',
+                        default     => 'success',
                     }),
 
                 // Referencia interna traída de la plataforma. No es lo que se
@@ -86,12 +87,36 @@ class LineasTable
                     ->label('Activa')
                     ->boolean(),
             ])
+            // Filtrar y luego "seleccionar todo" es lo que permite asignar
+            // tramos a todas las líneas de un cliente o de una cuenta de golpe.
             ->filters([
+                SelectFilter::make('cliente_id')
+                    ->label('Cliente')
+                    ->relationship('cliente', 'nombre')
+                    ->searchable()
+                    ->preload(),
+                SelectFilter::make('cuenta_id')
+                    ->label('Cuenta')
+                    ->relationship('cuenta', 'nombre_cuenta')
+                    ->searchable()
+                    ->preload(),
+                SelectFilter::make('plataforma')
+                    ->label('Plataforma')
+                    ->options([
+                        'meta'     => 'Meta Ads',
+                        'google'   => 'Google Ads',
+                        'tiktok'   => 'TikTok Ads',
+                        'linkedin' => 'LinkedIn Ads',
+                    ]),
                 Filter::make('sin_presupuesto')
-                    ->label('Solo las que no tienen presupuesto')
+                    ->label('Solo las que no tienen tramo vigente')
                     ->query(fn (Builder $query) => $query->whereDoesntHave(
                         'presupuestoEventos',
-                        fn (Builder $eventos) => $eventos->whereDate('fecha_efectiva', '<=', now()->toDateString())
+                        fn (Builder $tramos) => $tramos
+                            ->whereDate('desde', '<=', now()->toDateString())
+                            ->where(fn (Builder $q) => $q
+                                ->whereNull('hasta')
+                                ->orWhereDate('hasta', '>=', now()->toDateString()))
                     )),
             ])
             ->defaultSort('cliente.nombre')
@@ -117,23 +142,27 @@ class LineasTable
     private static function asignarObjetivo(): BulkAction
     {
         return BulkAction::make('asignar_objetivo')
-            ->label('Asignar objetivo del mes')
+            ->label('Asignar tramo de facturación')
             ->icon('heroicon-o-banknotes')
-            ->modalHeading('Objetivo del mes para las líneas seleccionadas')
-            ->modalDescription('Es lo que se le factura al cliente, no lo que se paga a la plataforma. El sistema lo reparte por días.')
+            ->modalHeading('Tramo de facturación para las líneas seleccionadas')
+            ->modalDescription('Al cliente se le factura el gasto real de la plataforma más este porcentaje, entre las dos fechas indicadas.')
             ->modalSubmitActionLabel('Asignar')
             ->schema([
-                DatePicker::make('fecha_efectiva')
-                    ->label('Desde (fecha)')
+                DatePicker::make('desde')
+                    ->label('Desde')
                     ->default(now()->startOfMonth())
-                    ->required()
-                    ->helperText('Normalmente el día 1 del mes. Si es a mitad de mes, el reparto se renivela solo.'),
-                TextInput::make('objetivo_mes')
-                    ->label('Objetivo cliente del mes (€)')
+                    ->required(),
+                DatePicker::make('hasta')
+                    ->label('Hasta (vacío = sin fin)')
+                    ->afterOrEqual('desde')
+                    ->helperText('Déjalo vacío para que el tramo siga vigente hasta que lo sustituyas por otro.'),
+                TextInput::make('porcentaje')
+                    ->label('Porcentaje sobre el gasto (%)')
                     ->numeric()
                     ->minValue(0)
+                    ->suffix('%')
                     ->required()
-                    ->helperText('Se aplica el mismo importe a cada línea seleccionada.'),
+                    ->helperText('25 = gasto real más un 25 %. Se aplica el mismo a todas las líneas seleccionadas.'),
                 Select::make('estado')
                     ->label('Estado')
                     ->options([
@@ -143,26 +172,36 @@ class LineasTable
                     ->default('activa')
                     ->required(),
                 TextInput::make('nota')
-                    ->label('Nota (opcional)'),
+                    ->label('Nota (opcional)')
+                    ->columnSpanFull(),
             ])
             ->action(function (Collection $records, array $data): void {
                 foreach ($records as $linea) {
+                    // Repetir la acción con las mismas fechas corrige ese tramo
+                    // en vez de acumular duplicados sobre la misma línea.
                     PresupuestoEvento::updateOrCreate(
                         [
-                            'linea_id'       => $linea->id,
-                            'fecha_efectiva' => $data['fecha_efectiva'],
+                            'linea_id' => $linea->id,
+                            'desde'    => $data['desde'],
+                            'hasta'    => $data['hasta'] ?? null,
                         ],
                         [
-                            'objetivo_mes' => $data['objetivo_mes'],
-                            'estado'       => $data['estado'],
-                            'nota'         => $data['nota'] ?? null,
+                            'porcentaje' => $data['porcentaje'],
+                            'estado'     => $data['estado'],
+                            'nota'       => $data['nota'] ?? null,
                         ]
                     );
                 }
 
                 Notification::make()
-                    ->title('Objetivo asignado')
-                    ->body(sprintf('%d líneas actualizadas desde el %s.', $records->count(), $data['fecha_efectiva']))
+                    ->title('Tramo asignado')
+                    ->body(sprintf(
+                        '%d líneas facturarán el gasto real +%s %% desde el %s%s.',
+                        $records->count(),
+                        $data['porcentaje'],
+                        $data['desde'],
+                        $data['hasta'] ? ' hasta el ' . $data['hasta'] : ''
+                    ))
                     ->success()
                     ->send();
             })

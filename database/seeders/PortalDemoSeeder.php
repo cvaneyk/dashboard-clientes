@@ -85,10 +85,16 @@ class PortalDemoSeeder extends Seeder
                 ]
             );
 
-            // Presupuesto-cliente de junio (un único evento a día 1).
+            // Tramo de facturación de junio: al cliente se le cobra el gasto
+            // real de la plataforma más un margen.
             PresupuestoEvento::updateOrCreate(
-                ['linea_id' => $linea->id, 'fecha_efectiva' => $mes->toDateString()],
-                ['objetivo_mes' => $objetivo, 'estado' => 'activa', 'nota' => 'Alta de mes']
+                ['linea_id' => $linea->id, 'desde' => $mes->toDateString()],
+                [
+                    'hasta'      => $mes->endOfMonth()->toDateString(),
+                    'porcentaje' => 25,
+                    'estado'     => 'activa',
+                    'nota'       => 'Alta de mes',
+                ]
             );
 
             // Reparto de las métricas REALES a lo largo de los 30 días, con

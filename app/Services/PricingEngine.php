@@ -3,7 +3,9 @@
 namespace App\Services;
 
 use App\Models\Linea;
+use App\Models\MetricaDiaria;
 use App\Models\Override;
+use App\Models\PresupuestoEvento;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
@@ -13,19 +15,23 @@ use Illuminate\Support\Collection;
  *
  * REGLA DE NEGOCIO
  * ----------------
- * El coste que ve el cliente NO es el gasto real de la plataforma, sino el
- * "objetivo del mes" (lo que se le va a facturar) repartido por días con la
- * lógica de:  presupuesto restante / días activos restantes.
+ * Al cliente se le factura el gasto real de la plataforma más un porcentaje:
  *
- * Esto absorbe todos los casos que pediste:
- *   - Prorrateo suave día a día.
- *   - Subir/bajar el objetivo a mitad de mes (se re-nivela solo, sin tocar
- *     los días ya pasados).
- *   - Pausar una línea (0 €/día a partir de la pausa).
- *   - Líneas que arrancan a mitad de mes (reparto sobre sus días activos).
+ *     coste_cliente_dia = gasto_real_dia * (1 + porcentaje/100)
  *
- * Las métricas reales (impresiones, clics, leads) salen del CSV; el CPC y el
- * CPL del cliente se calculan con el coste-cliente sobre esas métricas reales.
+ * El porcentaje vive en tramos con fecha de inicio y fin (presupuesto_eventos).
+ * De ahí salen los casos que hay que soportar:
+ *   - Cambiar el margen a mitad de mes: se abre un tramo nuevo.
+ *   - Pausar una línea: tramo en estado 'pausada' → 0 €/día.
+ *   - Día fuera de todo tramo → 0 €: no hay con qué facturarlo.
+ *   - Día sin gasto en la plataforma → 0 €: no hay nada que marginar.
+ *
+ * OJO: el coste del cliente sigue al gasto real día a día, así que ya NO hay
+ * objetivo mensual ni prorrateo. Cambiar el porcentaje de un tramo recalcula
+ * todo el periodo que cubre, porque el coste no se persiste.
+ *
+ * El gasto real por sí solo sigue siendo interno: lo que se enseña al cliente
+ * es siempre el resultado de esta multiplicación, nunca la base.
  */
 class PricingEngine
 {
@@ -39,39 +45,52 @@ class PricingEngine
         $inicioMes = CarbonImmutable::create($anio, $mes, 1)->startOfDay();
         $diasMes   = $inicioMes->daysInMonth;
 
-        // Eventos de presupuesto ordenados por fecha (incluye el último vigente
-        // ANTES del mes, para arrastrar el objetivo con el que se entra al mes).
-        $eventos = $linea->presupuestoEventos()
-            ->orderBy('fecha_efectiva')
-            ->get(['fecha_efectiva', 'objetivo_mes', 'estado']);
+        $tramos = $linea->presupuestoEventos()->get();
+        $gastos = $this->gastoRealPorDia($linea, $anio, $mes);
 
-        $out       = collect();
-        $acumulado = 0.0;
+        $out = collect();
 
         for ($d = 1; $d <= $diasMes; $d++) {
-            $dia = $inicioMes->addDays($d - 1);
+            $dia   = $inicioMes->addDays($d - 1);
+            $clave = $dia->toDateString();
 
-            // Evento vigente para este día (el último con fecha_efectiva <= día).
-            $vigente = $eventos->last(
-                fn ($e) => Carbon::parse($e->fecha_efectiva)->lte($dia)
-            );
+            // Tramo que cubre este día. Si se solapan, gana el que empieza más
+            // tarde: es lo que espera quien corrige añadiendo un tramo encima.
+            $tramo = $tramos
+                ->filter(fn (PresupuestoEvento $t) => $t->cubre($dia))
+                ->sortBy([['desde', 'asc'], ['id', 'asc']])
+                ->last();
 
-            if (! $vigente || $vigente->estado === 'pausada') {
-                // Línea aún no arrancada este mes, o pausada: 0 €.
-                $out->put($dia->toDateString(), 0.0);
+            // Día fuera de todo tramo, o línea pausada: no se factura.
+            if (! $tramo || $tramo->estado === 'pausada') {
+                $out->put($clave, 0.0);
                 continue;
             }
 
-            $objetivo      = (float) $vigente->objetivo_mes;
-            $restante      = max($objetivo - $acumulado, 0.0);
-            $diasRestantes = $diasMes - $d + 1;                 // incluye hoy
-            $costeDia      = $diasRestantes > 0 ? $restante / $diasRestantes : 0.0;
-
-            $acumulado += $costeDia;
-            $out->put($dia->toDateString(), round($costeDia, 2));
+            // Se factura lo que se pagó de verdad a la plataforma más el margen.
+            // Si ese día no hubo gasto, no hay nada que facturar.
+            $out->put($clave, round(($gastos[$clave] ?? 0.0) * $tramo->multiplicador(), 2));
         }
 
         return $this->aplicarOverrides($linea, $out);
+    }
+
+    /**
+     * Gasto real de la plataforma por día, indexado por 'Y-m-d'.
+     * Se lee de una vez por mes: el coste de cada día depende de él.
+     *
+     * @return array<string,float>
+     */
+    private function gastoRealPorDia(Linea $linea, int $anio, int $mes): array
+    {
+        return \App\Models\MetricaDiaria::where('linea_id', $linea->id)
+            ->whereYear('fecha', $anio)
+            ->whereMonth('fecha', $mes)
+            ->get(['fecha', 'gasto_real'])
+            ->mapWithKeys(fn ($m) => [
+                Carbon::parse($m->fecha)->toDateString() => (float) $m->gasto_real,
+            ])
+            ->all();
     }
 
     /**
