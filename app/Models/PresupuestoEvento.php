@@ -45,4 +45,39 @@ class PresupuestoEvento extends Model
     {
         return 1 + ((float) $this->porcentaje / 100);
     }
+
+    /**
+     * Cuál de los tramos manda en una fecha. Es la ÚNICA definición de la regla:
+     * la usan el motor de precios y el panel, para que nunca discrepen.
+     *
+     *   1. Si algún tramo que cubre ese día está pausado, manda la pausa. Pausar
+     *      tiene que poder hacerse añadiendo un tramo encima; si ganara el
+     *      porcentaje más alto, una pausa nunca llegaría a aplicarse.
+     *   2. Entre los activos, gana el PORCENTAJE MÁS ALTO. A igualdad, el
+     *      creado después.
+     *
+     * Consecuencia a tener presente: para BAJAR el margen no basta con añadir un
+     * tramo menor encima; hay que corregir o borrar el anterior.
+     *
+     * @param  \Illuminate\Support\Collection<int,self>  $tramos
+     */
+    public static function vigenteEn($tramos, CarbonInterface $fecha): ?self
+    {
+        $cubren = $tramos->filter(fn (self $t) => $t->cubre($fecha));
+
+        if ($cubren->isEmpty()) {
+            return null;
+        }
+
+        $pausados = $cubren->where('estado', 'pausada');
+
+        if ($pausados->isNotEmpty()) {
+            return $pausados->sortBy('id')->last();
+        }
+
+        return $cubren->sortBy([
+            ['porcentaje', 'asc'],
+            ['id', 'asc'],
+        ])->last();
+    }
 }

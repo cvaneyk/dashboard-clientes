@@ -54,12 +54,8 @@ class PricingEngine
             $dia   = $inicioMes->addDays($d - 1);
             $clave = $dia->toDateString();
 
-            // Tramo que cubre este día. Si se solapan, gana el que empieza más
-            // tarde: es lo que espera quien corrige añadiendo un tramo encima.
-            $tramo = $tramos
-                ->filter(fn (PresupuestoEvento $t) => $t->cubre($dia))
-                ->sortBy([['desde', 'asc'], ['id', 'asc']])
-                ->last();
+            // Qué tramo manda si varios cubren el día: ver PresupuestoEvento::vigenteEn().
+            $tramo = PresupuestoEvento::vigenteEn($tramos, $dia);
 
             // Día fuera de todo tramo, o línea pausada: no se factura.
             if (! $tramo || $tramo->estado === 'pausada') {

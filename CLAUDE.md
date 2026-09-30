@@ -32,8 +32,14 @@ Reglas derivadas, **no romper ninguna**:
   `porcentaje`, `estado` = `activa|pausada`). La tabla conserva el nombre por historia, pero sus
   filas ya no son eventos puntuales: son intervalos.
 - **Día fuera de todo tramo → 0 €.** No hay margen que aplicar, así que no se factura.
-- **Si dos tramos se solapan, gana el que empieza más tarde.** Corregir el margen se hace añadiendo
-  un tramo encima, no editando el anterior: así se conserva el histórico.
+- **Si varios tramos cubren un día manda [PresupuestoEvento::vigenteEn()](app/Models/PresupuestoEvento.php)**,
+  que es la única definición de la regla (la usan el motor y el panel, para que no discrepen):
+  primero **una pausa gana sobre todo** —si no, pausar sería imposible—, y entre los activos gana
+  el **porcentaje más alto**. Consecuencia: para **bajar** el margen no basta con añadir un tramo
+  menor encima, hay que corregir o borrar el anterior.
+- Al asignar en bloque, el modal **avisa si las fechas pisan tramos existentes** y exige marcar una
+  casilla para continuar. Repetir la acción con las **mismas fechas exactas** no cuenta como
+  solape: ahí `updateOrCreate` corrige ese tramo en vez de duplicarlo.
 - Lo normal es asignar tramos **en bloque** desde `/admin → Líneas` (filtros por cliente, cuenta y
   plataforma + acción masiva "Asignar tramo de facturación"). El repetidor de la ficha de cada
   línea queda plegado, para consultar y para casos sueltos.

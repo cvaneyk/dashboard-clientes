@@ -4,14 +4,18 @@ namespace App\Filament\Resources\Lineas\Tables;
 
 use App\Models\Linea;
 use App\Models\PresupuestoEvento;
+use Carbon\Carbon;
 use Filament\Actions\BulkAction;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
+use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
@@ -19,6 +23,7 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\HtmlString;
 
 class LineasTable
 {
@@ -147,15 +152,32 @@ class LineasTable
             ->modalHeading('Tramo de facturación para las líneas seleccionadas')
             ->modalDescription('Al cliente se le factura el gasto real de la plataforma más este porcentaje, entre las dos fechas indicadas.')
             ->modalSubmitActionLabel('Asignar')
-            ->schema([
+            ->schema(fn (Collection $records) => [
                 DatePicker::make('desde')
                     ->label('Desde')
                     ->default(now()->startOfMonth())
-                    ->required(),
+                    ->required()
+                    ->live(onBlur: true),
                 DatePicker::make('hasta')
                     ->label('Hasta (vacío = sin fin)')
                     ->afterOrEqual('desde')
+                    ->live(onBlur: true)
                     ->helperText('Déjalo vacío para que el tramo siga vigente hasta que lo sustituyas por otro.'),
+
+                // Aviso de solape, recalculado al cambiar las fechas.
+                Placeholder::make('aviso_solape')
+                    ->label('')
+                    ->content(fn (Get $get) => new HtmlString(self::avisoSolape($records, $get('desde'), $get('hasta'))))
+                    ->visible(fn (Get $get) => self::solapes($records, $get('desde'), $get('hasta')) !== [])
+                    ->columnSpanFull(),
+
+                // Puerta explícita: solo aparece (y solo es obligatoria) cuando
+                // de verdad hay solape, para no estorbar en el caso normal.
+                Checkbox::make('confirmar_solape')
+                    ->label('Entiendo que se solapa y quiero añadirlo igualmente')
+                    ->accepted()
+                    ->visible(fn (Get $get) => self::solapes($records, $get('desde'), $get('hasta')) !== [])
+                    ->columnSpanFull(),
                 TextInput::make('porcentaje')
                     ->label('Porcentaje sobre el gasto (%)')
                     ->numeric()
@@ -206,5 +228,82 @@ class LineasTable
                     ->send();
             })
             ->deselectRecordsAfterCompletion();
+    }
+
+    /**
+     * Líneas seleccionadas que ya tienen un tramo pisando ese rango de fechas.
+     *
+     * @param  Collection<int,Linea>  $lineas
+     * @return array<int,array{linea:string,porcentaje:float}>
+     */
+    public static function solapes(Collection $lineas, ?string $desde, ?string $hasta): array
+    {
+        if (! $desde) {
+            return [];
+        }
+
+        $ini = Carbon::parse($desde)->startOfDay();
+        $fin = $hasta ? Carbon::parse($hasta)->startOfDay() : null;
+
+        $out = [];
+
+        foreach ($lineas as $linea) {
+            foreach ($linea->presupuestoEventos as $tramo) {
+                if (! $tramo->desde) {
+                    continue;
+                }
+
+                // Un tramo con exactamente las mismas fechas no es un solape:
+                // la acción lo actualiza en sitio en vez de crear otro. Avisar
+                // aquí convertiría "corregir el porcentaje" en un falso positivo.
+                $mismasFechas = $tramo->desde->equalTo($ini)
+                    && (($fin === null && $tramo->hasta === null)
+                        || ($fin !== null && $tramo->hasta !== null && $tramo->hasta->equalTo($fin)));
+
+                if ($mismasFechas) {
+                    continue;
+                }
+
+                // Dos intervalos se solapan si cada uno empieza antes de que el
+                // otro acabe. Sin fecha de fin, el tramo llega hasta el infinito.
+                $empiezaAntesDeQueAcabeElNuevo = ! $fin || $tramo->desde->lte($fin);
+                $acabaDespuesDeQueEmpieceElNuevo = ! $tramo->hasta || $tramo->hasta->gte($ini);
+
+                if ($empiezaAntesDeQueAcabeElNuevo && $acabaDespuesDeQueEmpieceElNuevo) {
+                    $out[] = [
+                        'linea'      => $linea->producto ?: $linea->nombre,
+                        'porcentaje' => (float) $tramo->porcentaje,
+                    ];
+
+                    continue 2; // con un solape por línea basta para avisar
+                }
+            }
+        }
+
+        return $out;
+    }
+
+    /** Texto del aviso, con las líneas afectadas y lo que va a pasar. */
+    public static function avisoSolape(Collection $lineas, ?string $desde, ?string $hasta): string
+    {
+        $solapes = self::solapes($lineas, $desde, $hasta);
+
+        if ($solapes === []) {
+            return '';
+        }
+
+        $detalle = collect($solapes)
+            ->map(fn (array $s) => e($s['linea']) . ' (+' . number_format($s['porcentaje'], 2, ',', '.') . ' %)')
+            ->take(8)
+            ->implode(', ');
+
+        $resto = count($solapes) > 8 ? ' y ' . (count($solapes) - 8) . ' más' : '';
+
+        return '<div style="border-left:4px solid #b45309;background:#fffbeb;padding:10px 12px;border-radius:6px">'
+            . '<strong>' . count($solapes) . ' de las líneas seleccionadas ya tienen un tramo en esas fechas:</strong><br>'
+            . $detalle . $resto . '.<br><br>'
+            . 'Si continúas se aplicará <strong>el porcentaje más alto</strong> de los que se solapen. '
+            . 'Para <em>bajar</em> el margen no basta con añadir este tramo: hay que corregir o borrar el anterior.'
+            . '</div>';
     }
 }
