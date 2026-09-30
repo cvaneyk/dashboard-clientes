@@ -45,7 +45,7 @@ class TramosSolapadosTest extends TestCase
             'cliente_id' => $cliente->id,
             'cuenta_id'  => $cuenta->id,
             'plataforma' => 'meta',
-            'nombre'     => 'INFANTIL',
+            'nombre'     => 'INFANTIL_LEADADS',
             'producto'   => 'Infantil',
             'match_key'  => 'infantil',
             'nivel'      => 'campania',
@@ -153,7 +153,7 @@ class TramosSolapadosTest extends TestCase
         $solapes = LineasTable::solapes($this->seleccion(), '2026-09-10', '2026-09-20');
 
         $this->assertCount(1, $solapes);
-        $this->assertSame('Infantil', $solapes[0]['linea']);
+        $this->assertSame('INFANTIL_LEADADS', $solapes[0]['linea'], 'El nombre de campaña, no el producto');
         $this->assertSame(20.0, $solapes[0]['porcentaje']);
     }
 
@@ -164,7 +164,10 @@ class TramosSolapadosTest extends TestCase
         $aviso = LineasTable::avisoSolape($this->seleccion(), '2026-09-10', '2026-09-20');
 
         $this->assertStringContainsString('ya tienen un tramo en esas fechas', $aviso);
-        $this->assertStringContainsString('Infantil', $aviso);
+        $this->assertStringContainsString('INFANTIL_LEADADS', $aviso);
+        $this->assertStringNotContainsString('>Infantil<', $aviso, 'El producto no distingue entre líneas');
+        // El color del texto va explícito o el tema oscuro lo deja ilegible.
+        $this->assertStringContainsString('color:', $aviso);
         $this->assertStringContainsString('20,00 %', $aviso);
         $this->assertStringContainsString('el porcentaje más alto', $aviso);
     }

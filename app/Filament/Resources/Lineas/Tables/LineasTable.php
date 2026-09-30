@@ -271,7 +271,9 @@ class LineasTable
 
                 if ($empiezaAntesDeQueAcabeElNuevo && $acabaDespuesDeQueEmpieceElNuevo) {
                     $out[] = [
-                        'linea'      => $linea->producto ?: $linea->nombre,
+                        // El nombre de la campaña, no el producto: varias líneas
+                        // comparten producto y entonces no se sabría cuál es cuál.
+                        'linea'      => $linea->nombre,
                         'porcentaje' => (float) $tramo->porcentaje,
                     ];
 
@@ -299,7 +301,15 @@ class LineasTable
 
         $resto = count($solapes) > 8 ? ' y ' . (count($solapes) - 8) . ' más' : '';
 
-        return '<div style="border-left:4px solid #b45309;background:#fffbeb;padding:10px 12px;border-radius:6px">'
+        // El color del texto va explícito: sin él hereda el blanco del tema
+        // oscuro de Filament y queda ilegible sobre el fondo claro del aviso.
+        // La regla .dark lo adapta; si no casara, el caso por defecto sigue
+        // siendo legible (fondo claro con texto oscuro).
+        return '<style>'
+            . '.aviso-solape{border-left:4px solid #b45309;background:#fffbeb;color:#713f12;padding:10px 12px;border-radius:6px}'
+            . '.dark .aviso-solape{background:#422006;color:#fef3c7;border-left-color:#f59e0b}'
+            . '</style>'
+            . '<div class="aviso-solape">'
             . '<strong>' . count($solapes) . ' de las líneas seleccionadas ya tienen un tramo en esas fechas:</strong><br>'
             . $detalle . $resto . '.<br><br>'
             . 'Si continúas se aplicará <strong>el porcentaje más alto</strong> de los que se solapen. '
