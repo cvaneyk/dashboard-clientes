@@ -35,7 +35,12 @@ class CampaignImporter
             'meta'   => new MetaParser(),
             'google' => new GoogleParser(),
             'tiktok' => new TikTokParser(),
-            default  => throw new RuntimeException("No hay importador para la plataforma: {$plataforma}"),
+            // Una plataforma puede estar dada de alta (Cuenta::PLATAFORMAS) sin
+            // tener todavía lector de informes. El mensaje dice qué falta.
+            default  => throw new RuntimeException(
+                "Todavía no hay lector de informes para {$plataforma}. "
+                . 'Se crea a partir de un archivo de ejemplo exportado de esa plataforma.'
+            ),
         };
     }
 

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Cliente;
+use App\Models\Cuenta;
 use App\Models\MetricaDiaria;
 use App\Services\PricingEngine;
 use Carbon\Carbon;
@@ -27,12 +28,8 @@ use Illuminate\View\View;
  */
 class DashboardController extends Controller
 {
-    private const CANALES = [
-        'meta'     => 'Meta Ads',
-        'google'   => 'Google Ads',
-        'tiktok'   => 'TikTok Ads',
-        'linkedin' => 'LinkedIn Ads',
-    ];
+    /** Nombres visibles de los canales; ver Cuenta::PLATAFORMAS. */
+    private const CANALES = Cuenta::PLATAFORMAS;
 
     /**
      * Vista interna: la misma pantalla, pero con el GASTO REAL de plataforma

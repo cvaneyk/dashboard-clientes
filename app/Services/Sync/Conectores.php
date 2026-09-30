@@ -41,6 +41,8 @@ class Conectores
             'google'   => 'Google Ads',
             'tiktok'   => 'TikTok',
             'linkedin' => 'LinkedIn',
+            'spotify'  => 'Spotify',
+            'openai'   => 'OpenAI',
             default    => (string) $plataforma,
         };
     }

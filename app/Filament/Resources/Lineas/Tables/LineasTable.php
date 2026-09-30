@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Lineas\Tables;
 
+use App\Models\Cuenta;
 use App\Models\Linea;
 use App\Models\PresupuestoEvento;
 use Carbon\Carbon;
@@ -107,12 +108,7 @@ class LineasTable
                     ->preload(),
                 SelectFilter::make('plataforma')
                     ->label('Plataforma')
-                    ->options([
-                        'meta'     => 'Meta Ads',
-                        'google'   => 'Google Ads',
-                        'tiktok'   => 'TikTok Ads',
-                        'linkedin' => 'LinkedIn Ads',
-                    ]),
+                    ->options(Cuenta::PLATAFORMAS),
                 Filter::make('sin_presupuesto')
                     ->label('Solo las que no tienen tramo vigente')
                     ->query(fn (Builder $query) => $query->whereDoesntHave(

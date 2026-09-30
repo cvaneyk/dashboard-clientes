@@ -9,6 +9,26 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Cuenta extends Model
 {
+    /**
+     * Plataformas que puede tener una cuenta, con su nombre visible.
+     *
+     * Única fuente de verdad: la usan los formularios, los filtros y el
+     * dashboard. Antes estaba copiada en cinco sitios y cada plataforma nueva
+     * se olvidaba en alguno.
+     *
+     * Tener conector de API es independiente: eso lo dice Conectores::PLATAFORMAS.
+     * Una plataforma de esta lista sin conector se alimenta con informes subidos
+     * a mano, que es como empezaron todas.
+     */
+    public const PLATAFORMAS = [
+        'meta'     => 'Meta Ads',
+        'google'   => 'Google Ads',
+        'tiktok'   => 'TikTok Ads',
+        'linkedin' => 'LinkedIn Ads',
+        'spotify'  => 'Spotify Ads',
+        'openai'   => 'OpenAI Ads',
+    ];
+
     protected $table = 'cuentas';
     protected $fillable = [
         'cliente_id', 'plataforma', 'nombre_cuenta', 'external_id',

@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Cuentas\Schemas;
 
+use App\Models\Cuenta;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
@@ -21,12 +22,7 @@ class CuentaForm
                     ->required(),
                 Select::make('plataforma')
                     ->label('Plataforma')
-                    ->options([
-                        'meta'     => 'Meta Ads',
-                        'google'   => 'Google Ads',
-                        'tiktok'   => 'TikTok Ads',
-                        'linkedin' => 'LinkedIn Ads',
-                    ])
+                    ->options(Cuenta::PLATAFORMAS)
                     ->live()
                     ->required(),
                 TextInput::make('nombre_cuenta')

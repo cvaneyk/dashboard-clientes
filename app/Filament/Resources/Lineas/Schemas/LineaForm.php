@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Lineas\Schemas;
 
+use App\Models\Cuenta;
 use App\Models\Linea;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Placeholder;
@@ -31,12 +32,7 @@ class LineaForm
                     ->required(),
                 Select::make('plataforma')
                     ->label('Plataforma')
-                    ->options([
-                        'meta'     => 'Meta Ads',
-                        'google'   => 'Google Ads',
-                        'tiktok'   => 'TikTok Ads',
-                        'linkedin' => 'LinkedIn Ads',
-                    ])
+                    ->options(Cuenta::PLATAFORMAS)
                     ->default('meta')
                     ->required(),
                 TextInput::make('nombre')

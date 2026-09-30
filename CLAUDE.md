@@ -161,7 +161,11 @@ hay que crear `app/Filament/Resources/Overrides/`.
 ## 5. Modelo de datos
 
 - `clientes` — cliente final (nombre, slug, logo, color, activo).
-- `cuentas` — cuenta publicitaria por plataforma (`meta|google|tiktok|linkedin`).
+- `cuentas` — cuenta publicitaria por plataforma. Las plataformas válidas y su nombre visible están
+  en **[`Cuenta::PLATAFORMAS`](app/Models/Cuenta.php)**, única fuente de verdad que usan los
+  formularios, los filtros y el dashboard. Estar en esa lista **no** implica tener conector de API
+  (eso lo dice `Conectores::PLATAFORMAS`) ni lector de informes (`CampaignImporter::parserFor()`):
+  una plataforma puede existir solo para carga manual, que es como empezaron todas.
   `tipos_conversion` (opcional) fija qué conversiones de Meta cuentan como lead en esa cuenta.
 - `lineas` — campaña/adset presupuestada; `match_key` normalizada, `nivel` (`campania|adset`).
   `presupuesto_plataforma` (+ `_tipo` `diario|total`, `_nivel` `campania|adsets`, `_actualizado_en`)
