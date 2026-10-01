@@ -132,6 +132,8 @@ app/
     MetaConnector.php               ← Marketing API de Meta → importRows() (sección 6b)
     GoogleAdsConnector.php          ← Google Ads API (GAQL) → importRows() (sección 6b)
     LinkedInConnector.php           ← LinkedIn Ads API → importRows() (sección 6b)
+    SpotifyConnector.php            ← Spotify Ads API v3 → importRows() (sección 6b)
+    OpenAiAdsConnector.php          ← OpenAI Advertiser API → importRows() (sección 6b)
   Console/Commands/PortalImport.php ← php artisan portal:import {cuenta_id} {ruta}
   Console/Commands/PortalSync.php   ← php artisan portal:sync {--cuenta=} {--dias=3}
   Http/Controllers/
@@ -140,13 +142,14 @@ app/
     AccountController.php           ← /cuenta, cambio de contraseña del cliente
     Conexiones/MetaConexionController.php ← OAuth de Meta (autorizar + callback)
     Conexiones/GoogleConexionController.php ← OAuth de Google Ads
+    Conexiones/{LinkedIn,Spotify}ConexionController.php ← OAuth de LinkedIn y Spotify
   Filament/Resources/               ← Clientes, Cuentas, Lineas, PresupuestoEventos,
                                       MetricaDiarias, ImportLogs, Users
   Models/                           ← Cliente, Cuenta, Linea, PresupuestoEvento,
                                       MetricaDiaria, Override, ImportLog, User, ConexionApi
 resources/views/portal/             ← dashboard.blade.php, login.blade.php, cuenta.blade.php
 routes/web.php                      ← /login, /dashboard, /cuenta, /media/logo/{cliente},
-                                      /conexiones/{meta,google}/{autorizar,callback}
+                                      /conexiones/{meta,google,linkedin,spotify}/{autorizar,callback}
 routes/console.php                  ← portal:sync diario a las 07:30 (Europe/Madrid)
 database/migrations/2026_08_11_*    ← tablas del portal + cliente_id/es_admin en users
 database/migrations/2026_09_23_*    ← conexiones_api (tokens de API por cuenta)
@@ -179,7 +182,8 @@ hay que crear `app/Filament/Resources/Overrides/`.
 - `overrides` — ajustes manuales.
 - `import_logs` — auditoría de importaciones, con `origen` (`manual|api`) y `filas_error`.
 - `conexiones_api` — credenciales de API **por cuenta** (1:1 con `cuentas`). `metodo`
-  (`system_user|oauth` en Meta, `mcc|oauth` en Google), `access_token` y `refresh_token` **cifrados**
+  (`system_user|oauth` en Meta, `mcc|oauth` en Google, `oauth` en LinkedIn y Spotify, `api_key` en
+  OpenAI), `access_token` y `refresh_token` **cifrados**
   (cast `encrypted`), `login_customer_id` (la MCC de Google, opcional), `expires_at`,
   `ultima_sincronizacion`, `ultimo_error`.
 - `users` — + `cliente_id`, `es_admin`.
@@ -232,7 +236,7 @@ interno ya está resuelto.
 
 ---
 
-## 6b. Sincronización por API: Meta, Google Ads y LinkedIn (implementados); TikTok (pendiente)
+## 6b. Sincronización por API: Meta, Google Ads, LinkedIn, Spotify y OpenAI (implementados); TikTok (pendiente)
 
 Todos los conectores implementan [Conector](app/Services/Sync/Conector.php) (`sincronizar` /
 `sincronizarRango`) y [Conectores::para($cuenta)](app/Services/Sync/Conectores.php) elige el que
@@ -332,6 +336,46 @@ madrugada.
   con ese acceso autoriza por OAuth (`/conexiones/linkedin/{autorizar,callback}`). El access token
   dura ~60 días y se renueva con el refresh token, que solo dan las apps aprobadas en el
   **Marketing Developer Platform**; sin esa aprobación no hay ni `r_ads` ni `r_ads_reporting`.
+
+### Spotify Ads
+
+[SpotifyConnector](app/Services/Sync/SpotifyConnector.php), Ads API v3
+(`api-partner.spotify.com/ads/v3`). Diferencias:
+
+- **OAuth con tokens en dos escalones**, como Google: refresh token que no caduca + access de una
+  hora (`/conexiones/spotify/{autorizar,callback}`). Credenciales de la app en `.env`
+  (`SPOTIFY_ADS_CLIENT_ID/SECRET`) y **el client ID tiene que aceptar los términos de la Ads API**
+  en `adsmanager.spotify.com/api-terms` (tarda hasta una hora): si no, el OAuth funciona pero todo
+  lo demás da 401/403. El conector lo recuerda en el mensaje de error.
+- `external_id` es el **UUID** de la cuenta publicitaria (se valida el formato).
+- El informe (`aggregate_reports`, `entity_type=CAMPAIGN`, `granularity=DAY`) trae las métricas como
+  **lista de `{field_type, field_value}`**; los parámetros repetidos (`fields=A&fields=B`) se montan a
+  mano. Pagina con `continuation_token`, que se manda **solo**.
+- Con `DAY` el rango **no puede pasar de 90 días**: se trocea. Los días son **UTC**.
+- Gasto en decimal de la moneda; presupuestos en **micros** y **solo en los ad sets** (se suman por
+  campaña, nivel `adsets`).
+- Leads por prioridad con `cuentas.tipos_conversion` (por defecto `LEADS,SIGN_UPS`, requieren el
+  píxel de Spotify). Los nombres que Spotify no reconoce se descartan antes de pedir, porque uno
+  inválido tumbaría el informe. **Entre 1 y 4 conversiones llegan como `-5`** (privacidad): se
+  cuentan como 0.
+
+### OpenAI Ads (anuncios en ChatGPT)
+
+[OpenAiAdsConnector](app/Services/Sync/OpenAiAdsConnector.php), Advertiser API
+(`api.ads.openai.com/v1`). Es el más simple:
+
+- **Sin OAuth ni credenciales de agencia.** Cada cuenta publicitaria genera su clave en Ads Manager
+  → Settings y **esa clave solo ve esa cuenta**. Se pega en la ficha (`metodo = api_key`). Al
+  guardarla se llama a `GET /ad_account`: si la ficha tiene `external_id` y no coincide, se rechaza
+  (evita conectar la clave de otro cliente); si está vacío, se rellena.
+- Un solo informe (`/ad_account/insights`, `aggregation_level=campaign`, `time_granularity=daily`)
+  ya trae nombre de campaña y día (`readable_time`), en la zona horaria de la cuenta. Paginación por
+  cursor (`after=last_id` mientras `has_more`). Rango máximo 365 días: se trocea.
+- Gasto en la moneda (no micros); el presupuesto es solo límite total, en **micros**.
+- Leads = `conversions` (objetivo de la campaña, ventanas por defecto 30 días clic + 1 vista).
+  Métrica no disponible → `null` → 0. **No hay alcance.**
+- **El día en curso no se pide**: "hasta hoy" acaba a medianoche de mañana y la API rechaza rangos
+  futuros. Lo trae la sincronización siguiente.
 
 Comandos: `php artisan portal:sync` (todas las cuentas conectadas, de cualquier plataforma con
 conector), `--cuenta=ID`, `--dias=7`, `--desde=2026-04-01 --hasta=2026-07-31`.

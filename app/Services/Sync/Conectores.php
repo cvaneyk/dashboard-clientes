@@ -8,13 +8,13 @@ use RuntimeException;
 /**
  * Elige el conector que toca según la plataforma de la Cuenta.
  *
- * Añadir TikTok o LinkedIn es escribir su conector, que implemente Conector, y
- * apuntarlo aquí: ni el comando ni el panel se enteran.
+ * Añadir una plataforma (falta TikTok) es escribir su conector, que implemente
+ * Conector, y apuntarlo aquí: ni el comando ni el panel se enteran.
  */
 class Conectores
 {
     /** Plataformas con sincronización por API disponible. */
-    public const PLATAFORMAS = ['meta', 'google', 'linkedin'];
+    public const PLATAFORMAS = ['meta', 'google', 'linkedin', 'spotify', 'openai'];
 
     public static function para(Cuenta $cuenta): Conector
     {
@@ -22,6 +22,8 @@ class Conectores
             'meta'     => app(MetaConnector::class),
             'google'   => app(GoogleAdsConnector::class),
             'linkedin' => app(LinkedInConnector::class),
+            'spotify'  => app(SpotifyConnector::class),
+            'openai'   => app(OpenAiAdsConnector::class),
             default  => throw new RuntimeException(
                 "Todavía no hay sincronización por API para {$cuenta->plataforma}: esa cuenta se alimenta con informes subidos a mano."
             ),

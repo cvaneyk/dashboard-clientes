@@ -5,6 +5,7 @@ use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Conexiones\GoogleConexionController;
 use App\Http\Controllers\Conexiones\LinkedInConexionController;
 use App\Http\Controllers\Conexiones\MetaConexionController;
+use App\Http\Controllers\Conexiones\SpotifyConexionController;
 use App\Http\Controllers\DashboardController;
 use App\Models\Cliente;
 use Illuminate\Support\Facades\Auth;
@@ -70,4 +71,9 @@ Route::middleware('auth:admin')->group(function () {
         ->name('conexiones.linkedin.autorizar');
     Route::get('/conexiones/linkedin/callback', [LinkedInConexionController::class, 'callback'])
         ->name('conexiones.linkedin.callback');
+
+    Route::get('/conexiones/spotify/autorizar', [SpotifyConexionController::class, 'autorizar'])
+        ->name('conexiones.spotify.autorizar');
+    Route::get('/conexiones/spotify/callback', [SpotifyConexionController::class, 'callback'])
+        ->name('conexiones.spotify.callback');
 });

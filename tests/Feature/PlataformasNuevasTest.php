@@ -14,9 +14,9 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /**
- * Spotify y OpenAI dadas de alta para la vía manual: se pueden crear cuentas,
- * importar informes y pintarlas en el dashboard, pero todavía no tienen ni
- * lector de informes ni conector de API.
+ * Spotify y OpenAI: se pueden crear cuentas, cargar filas a mano y pintarlas
+ * en el dashboard. Tienen conector de API (SpotifyConnectorTest,
+ * OpenAiAdsConnectorTest) pero todavía no lector de informes descargados.
  *
  * Lo que se fija aquí es que estar dada de alta y tener conector son cosas
  * distintas, y que la que falta lo diga con claridad en vez de romper.
@@ -89,15 +89,22 @@ class PlataformasNuevasTest extends TestCase
         }
     }
 
-    /** Dadas de alta, pero sin conector de API: el comando no debe intentarlo. */
-    public function test_no_tienen_conector_de_api_todavia(): void
+    /**
+     * Ya tienen conector de API, pero sin conexión el comando tiene que decir
+     * eso, no que la plataforma no se sincroniza. Una plataforma sin conector
+     * (TikTok) sigue explicando que va por carga manual.
+     */
+    public function test_tienen_conector_de_api_y_sin_conexion_lo_dicen(): void
     {
-        $this->assertFalse(Conectores::soportada('spotify'));
-        $this->assertFalse(Conectores::soportada('openai'));
+        $this->assertTrue(Conectores::soportada('spotify'));
+        $this->assertTrue(Conectores::soportada('openai'));
+        $this->assertFalse(Conectores::soportada('tiktok'));
 
-        $cuenta = $this->cuenta('openai');
+        $this->artisan('portal:sync', ['--cuenta' => $this->cuenta('openai')->id])
+            ->expectsOutputToContain('no tiene conexión con la API')
+            ->assertFailed();
 
-        $this->artisan('portal:sync', ['--cuenta' => $cuenta->id])
+        $this->artisan('portal:sync', ['--cuenta' => $this->cuenta('tiktok')->id])
             ->expectsOutputToContain('todavía no tiene conector')
             ->assertFailed();
     }

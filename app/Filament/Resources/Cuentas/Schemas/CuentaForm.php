@@ -29,14 +29,25 @@ class CuentaForm
                     ->label('Nombre de la cuenta')
                     ->required(),
                 TextInput::make('external_id')
-                    ->label('ID de cuenta en la plataforma (opcional)'),
+                    ->label('ID de cuenta en la plataforma (opcional)')
+                    ->helperText(fn ($get) => match ($get('plataforma')) {
+                        'spotify' => 'El UUID de la cuenta publicitaria, el que aparece en la URL de Spotify Ads Manager.',
+                        'openai'  => 'Opcional: si lo dejas vacío se rellena al conectar con el de la clave de API.',
+                        default   => null,
+                    }),
                 TextInput::make('tipos_conversion')
                     ->label('Qué cuenta como lead (opcional)')
-                    ->placeholder(implode(',', (array) config('services.meta.tipos_conversion')))
-                    ->helperText(fn ($get) => $get('plataforma') === 'linkedin'
-                        ? 'Campos de conversión de LinkedIn separados por comas, por orden de prioridad: se usa el primero con valor. Por defecto oneClickLeads (formularios) y luego externalWebsiteConversions (Insight Tag).'
-                        : 'Tipos de conversión de Meta separados por comas, por orden de prioridad: se usa el primero que aparezca en cada campaña. Vacío = la lista por defecto. Para ver cuáles devuelve esta cuenta: php artisan portal:meta-acciones {id}')
-                    ->visible(fn ($get) => in_array($get('plataforma'), ['meta', 'linkedin'], true))
+                    ->placeholder(fn ($get) => implode(',', (array) config(match ($get('plataforma')) {
+                        'linkedin' => 'services.linkedin_ads.tipos_conversion',
+                        'spotify'  => 'services.spotify_ads.tipos_conversion',
+                        default    => 'services.meta.tipos_conversion',
+                    })))
+                    ->helperText(fn ($get) => match ($get('plataforma')) {
+                        'linkedin' => 'Campos de conversión de LinkedIn separados por comas, por orden de prioridad: se usa el primero con valor. Por defecto oneClickLeads (formularios) y luego externalWebsiteConversions (Insight Tag).',
+                        'spotify'  => 'Campos de conversión de Spotify separados por comas, por orden de prioridad: se usa el primero con valor. Valen LEADS, SIGN_UPS, PURCHASES, ADD_TO_CART, START_CHECKOUT, PAGE_VIEWS y CUSTOM_EVENT_1…5. Requieren el píxel de Spotify en la web.',
+                        default    => 'Tipos de conversión de Meta separados por comas, por orden de prioridad: se usa el primero que aparezca en cada campaña. Vacío = la lista por defecto. Para ver cuáles devuelve esta cuenta: php artisan portal:meta-acciones {id}',
+                    })
+                    ->visible(fn ($get) => in_array($get('plataforma'), ['meta', 'linkedin', 'spotify'], true))
                     ->columnSpanFull(),
                 Toggle::make('activo')
                     ->label('Activa')

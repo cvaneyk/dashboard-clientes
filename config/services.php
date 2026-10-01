@@ -123,6 +123,40 @@ return [
         ))),
     ],
 
+    /*
+    | Spotify Ads API (v3).
+    |
+    | App en developer.spotify.com marcando "Ads API", con
+    |   {APP_URL}/conexiones/spotify/callback
+    | en "Redirect URIs". ADEMÁS hay que aceptar los términos de la Ads API con
+    | el client ID en adsmanager.spotify.com/api-terms (tarda hasta una hora):
+    | sin eso el OAuth funciona pero todas las llamadas a la API fallan.
+    |
+    | Lo único por cliente es el UUID de su cuenta publicitaria (external_id)
+    | y el refresh token de quien autoriza.
+    */
+    'spotify_ads' => [
+        'client_id'     => env('SPOTIFY_ADS_CLIENT_ID'),
+        'client_secret' => env('SPOTIFY_ADS_CLIENT_SECRET'),
+
+        /*
+        | Qué cuenta como lead, por prioridad (mismo criterio que en Meta: se
+        | usa el primer campo con valor, nunca la suma). Son campos del informe
+        | de Spotify: LEADS, SIGN_UPS, PURCHASES, CUSTOM_EVENT_1… Requieren el
+        | píxel de Spotify en la web. Cada Cuenta puede sobrescribirlo.
+        */
+        'tipos_conversion' => array_values(array_filter(array_map(
+            'trim',
+            explode(',', (string) env('SPOTIFY_ADS_TIPOS_CONVERSION', 'LEADS,SIGN_UPS'))
+        ))),
+    ],
+
+    /*
+    | OpenAI Ads (Advertiser API) no necesita nada aquí: cada cuenta
+    | publicitaria genera su propia clave en Ads Manager → Settings y se pega
+    | en la ficha de la Cuenta en /admin.
+    */
+
     'resend' => [
         'key' => env('RESEND_API_KEY'),
     ],
