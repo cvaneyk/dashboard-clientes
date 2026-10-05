@@ -24,7 +24,7 @@
 </head>
 <body>
 	<div class="card">
-		<div class="brand">oli<b>media</b></div>
+		<div class="brand"><img src="https://olimedia.es/wp-content/themes/olimedia/assets/img/olimedia-logo.png" alt="OliMedia Agencia de Marketing"></div>
 		<p class="sub">Portal de clientes · Campañas</p>
 
 		@if ($errors->any())

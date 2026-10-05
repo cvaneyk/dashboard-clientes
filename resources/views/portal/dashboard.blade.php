@@ -122,7 +122,7 @@
 					<img class="clogo" src="{{ $logoUrl }}" alt="{{ $cliente->nombre }}">
 				@endif
 				<div>
-					<div class="brand">oli<b>media</b></div>
+					<div class="brand"><img src="https://olimedia.es/wp-content/themes/olimedia/assets/img/olimedia-logo.png" alt="OliMedia Agencia de Marketing"></div>
 					<div class="client">{{ $cliente->nombre }}</div>
 				</div>
 			</div>
@@ -263,7 +263,7 @@
 	<footer class="foot">
 		<div class="wrap">
 			<div class="foot__row">
-				<div class="brand">oli<b>media</b></div>
+				<div class="brand"><img src="https://olimedia.es/wp-content/themes/olimedia/assets/img/olimedia-logo.png" alt="OliMedia Agencia de Marketing"></div>
 				<div>
 					<a href="https://olimedia.es" target="_blank" rel="noopener">olimedia.es</a>
 					<a href="https://olimedia.es/servicios/" target="_blank" rel="noopener">Servicios</a>
