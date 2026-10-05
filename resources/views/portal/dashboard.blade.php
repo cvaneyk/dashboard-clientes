@@ -14,7 +14,7 @@
 		.top__row{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
 		.top__brand{display:flex;align-items:center;gap:14px}
 		.clogo{height:40px;max-width:150px;object-fit:contain;border-right:1px solid var(--border);padding-right:14px}
-		.brand{font-size:1.2rem;font-weight:800;letter-spacing:-.02em}.brand b{color:var(--green)}
+		.brand img{width:120px;height:auto}
 		.client{font-size:.9rem;color:var(--mut)}
 		.logout{border:0;background:none;color:var(--mut);font-size:.9rem;cursor:pointer;text-decoration:underline}
 		.top__actions{display:flex;align-items:center;gap:16px}
@@ -100,7 +100,7 @@
 
 		.foot{margin-top:auto;background:var(--ink);color:rgba(255,255,255,.7);padding:34px 0 22px}
 		.foot__row{display:flex;flex-wrap:wrap;gap:16px;align-items:center;justify-content:space-between}
-		.foot .brand{color:#fff;font-size:1.15rem}.foot .brand b{color:var(--green)}
+		.foot .brand img{width:120px;height:auto}
 		.foot a{color:rgba(255,255,255,.75);text-decoration:none;font-size:.9rem;margin-left:18px}
 		.foot a:hover{color:var(--green)}
 		.foot__copy{font-size:.82rem;color:rgba(255,255,255,.5);margin-top:14px}

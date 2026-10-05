@@ -9,7 +9,7 @@
 		*{box-sizing:border-box;margin:0;font-family:"Outfit",system-ui,-apple-system,"Segoe UI",sans-serif}
 		body{background:var(--bg);min-height:100vh;display:grid;place-items:center;padding:24px;color:var(--ink)}
 		.card{width:100%;max-width:440px;background:#fff;border:1px solid var(--border);border-radius:20px;padding:34px;box-shadow:0 30px 70px -40px rgba(20,20,20,.4)}
-		.brand{font-size:1.5rem;font-weight:800;letter-spacing:-.02em}.brand b{color:var(--green)}
+		.brand img{width:120px;height:auto}
 		.sub{color:var(--mut);font-size:.92rem;margin:2px 0 24px}
 		h1{font-size:1.15rem;font-weight:800;margin-bottom:18px}
 		label{display:block;font-size:.86rem;font-weight:600;margin:0 0 6px}
