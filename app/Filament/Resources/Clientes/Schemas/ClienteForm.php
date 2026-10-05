@@ -40,6 +40,22 @@ class ClienteForm
                 Toggle::make('activo')
                     ->label('Activo')
                     ->default(true),
+                TextInput::make('email_informes')
+                    ->label('Email para informes')
+                    ->placeholder('marketing@cliente.com, director@cliente.com')
+                    ->maxLength(500)
+                    ->helperText('Uno o varios, separados por coma. Aquí llega el informe semanal de campañas.')
+                    ->rule(fn () => function (string $attribute, $value, \Closure $fail) {
+                        $partes = preg_split('/[\s,;]+/', (string) $value, -1, PREG_SPLIT_NO_EMPTY);
+                        $malos  = array_filter($partes, fn ($e) => ! filter_var($e, FILTER_VALIDATE_EMAIL));
+                        if ($malos) {
+                            $fail('Email no válido: ' . implode(', ', $malos));
+                        }
+                    }),
+                Toggle::make('informe_semanal')
+                    ->label('Enviar informe semanal (lunes)')
+                    ->helperText('Resumen de la semana anterior. La plantilla se edita en "Plantillas de email".')
+                    ->default(false),
             ]);
     }
 }

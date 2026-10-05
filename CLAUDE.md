@@ -423,6 +423,28 @@ con logos SVG inline, tabla de campañas con borde de color por canal, export CS
 
 ---
 
+## 7b. Informes semanales por email
+
+`portal:informes` (scheduler: **lunes 09:00** Madrid, tras la sync de las 07:30) envía la semana
+lunes-domingo anterior:
+
+- **Al cliente**: si en su ficha tiene `informe_semanal` activado y `email_informes` (uno o varios,
+  separados por coma). Sale del motor de precios como el dashboard: **nunca lleva `gasto_real`**.
+  Sin actividad en la semana no se envía; `ultimo_informe_en` evita duplicados el mismo día.
+- **A administración**: resumen de todas las cuentas **con gasto real, facturado y margen**, más
+  avisos (errores de sync, gasto sin tramo, clientes sin email). Destinatarios: `INFORME_ADMIN_EMAIL`
+  en `.env` o, si está vacío, todos los usuarios admin.
+
+Lógica en [InformesSemanales](app/Services/Informes/InformesSemanales.php). Los textos están en
+`plantillas_email` y se editan en `/admin → Plantillas de email` (solo editar: las crea la
+migración y cada una la usa un informe por su `clave`). Variables entre llaves (`{cliente}`), con
+`strtr`, **no Blade**: el texto viene del panel. Las de texto se escapan; las tablas (`{tabla_*}`)
+son el único HTML inyectado. Para probar: acción "Enviar informe" en la lista de Clientes, "Enviar
+prueba" en la plantilla, o `php artisan portal:informes --cliente=slug --para=yo@olimedia.es`.
+Requiere SMTP en `.env` (`MAIL_*`); con `MAIL_MAILER=log` el panel avisa de que no saldrá nada.
+
+---
+
 ## 8. Flujo de trabajo
 
 - **El repo GitHub `cvaneyk/clientes-portal` es la fuente de verdad.** Push → Plesk despliega.

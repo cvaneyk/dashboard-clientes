@@ -22,3 +22,14 @@ Schedule::command('portal:sync')
     ->dailyAt('07:30')
     ->timezone('Europe/Madrid')
     ->withoutOverlapping();
+
+/*
+ * Informes semanales por email (semana lunes-domingo anterior): el de cada
+ * cliente con el informe activado en su ficha y el resumen interno de todas
+ * las cuentas para administración. A las 09:00, cuando la sincronización de
+ * las 07:30 ya ha traído el domingo. Necesita el SMTP configurado en .env.
+ */
+Schedule::command('portal:informes')
+    ->weeklyOn(1, '09:00')
+    ->timezone('Europe/Madrid')
+    ->withoutOverlapping();

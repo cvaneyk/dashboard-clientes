@@ -157,6 +157,15 @@ return [
     | en la ficha de la Cuenta en /admin.
     */
 
+    /*
+    | Informes semanales por email. Destinatarios del resumen interno (todas las
+    | cuentas, con gasto real y margen), separados por coma. Si se deja vacío,
+    | se manda a todos los usuarios admin.
+    */
+    'informes' => [
+        'admin' => env('INFORME_ADMIN_EMAIL'),
+    ],
+
     'resend' => [
         'key' => env('RESEND_API_KEY'),
     ],
