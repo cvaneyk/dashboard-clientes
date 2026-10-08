@@ -7,6 +7,7 @@ use App\Http\Controllers\Conexiones\LinkedInConexionController;
 use App\Http\Controllers\Conexiones\MetaConexionController;
 use App\Http\Controllers\Conexiones\SpotifyConexionController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\GlobalesController;
 use App\Models\Cliente;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
@@ -47,6 +48,12 @@ Route::middleware('auth:web,admin')->group(function () {
     // facturado. Solo admins: el propio controlador aborta si no lo es.
     Route::get('/dashboard/interno', [DashboardController::class, 'interno'])
         ->name('portal.dashboard.interno');
+
+    // Gastos globales: todas las líneas de los clientes visibles, unificadas
+    // por canal o por cliente. La interna (gasto real y margen) es solo admins.
+    Route::get('/globales', [GlobalesController::class, 'index'])->name('portal.globales');
+    Route::get('/globales/interno', [GlobalesController::class, 'interno'])
+        ->name('portal.globales.interno');
 
     // Mi cuenta (cambio de contraseña del cliente).
     Route::get('/cuenta', [AccountController::class, 'edit'])->name('portal.cuenta');

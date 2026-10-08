@@ -141,6 +141,8 @@
 					</form>
 				@endif
 
+				<a class="tlink" href="{{ route($esInterno ? 'portal.globales.interno' : 'portal.globales') }}">Gastos globales</a>
+
 				@if ($esAdmin)
 					@if ($esInterno)
 						<span class="vista">datos internos</span>
