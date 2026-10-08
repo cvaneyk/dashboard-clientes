@@ -25,7 +25,7 @@ class LineaForm
                     ->preload()
                     ->required(),
                 Select::make('cuenta_id')
-                    ->label('Cuenta publicitaria')
+                    ->label('Canal')
                     ->relationship('cuenta', 'nombre_cuenta')
                     ->searchable()
                     ->preload()

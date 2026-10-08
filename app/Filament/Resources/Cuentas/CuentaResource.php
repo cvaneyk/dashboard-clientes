@@ -22,9 +22,9 @@ class CuentaResource extends Resource
 
     protected static ?string $recordTitleAttribute = 'nombre_cuenta';
 
-    protected static ?string $modelLabel = 'Cuenta';
+    protected static ?string $modelLabel = 'Canal';
 
-    protected static ?string $pluralModelLabel = 'Cuentas';
+    protected static ?string $pluralModelLabel = 'Canales';
 
     public static function form(Schema $schema): Schema
     {

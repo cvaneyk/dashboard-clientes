@@ -30,13 +30,13 @@ class EditCuenta extends EditRecord
 
         if (request()->query('conexion') === 'ok') {
             Notification::make()
-                ->title('Cuenta conectada con la API de ' . Conectores::nombre($this->getRecord()->plataforma))
+                ->title('Canal conectado con la API de ' . Conectores::nombre($this->getRecord()->plataforma))
                 ->success()
                 ->send();
         }
         if (request()->query('conexion') === 'error') {
             Notification::make()
-                ->title('No se pudo conectar la cuenta')
+                ->title('No se pudo conectar el canal')
                 ->body(request()->query('mensaje'))
                 ->danger()
                 ->persistent()
@@ -107,7 +107,7 @@ class EditCuenta extends EditRecord
                         ]
                     );
 
-                    Notification::make()->title('Token guardado; la cuenta queda conectada')->success()->send();
+                    Notification::make()->title('Token guardado; el canal queda conectado')->success()->send();
                 })
                 ->visible($soloMeta),
 
@@ -128,7 +128,7 @@ class EditCuenta extends EditRecord
                     : 'Conectar con la MCC de OliMedia')
                 ->icon('heroicon-o-key')
                 ->modalHeading('Refresh token de Google Ads')
-                ->modalDescription('Para las cuentas que cuelgan de vuestra cuenta de administrador (MCC). El mismo refresh token sirve para todos esos clientes: lo que cambia es el customer ID de cada Cuenta.')
+                ->modalDescription('Para los canales que cuelgan de vuestra cuenta de administrador (MCC). El mismo refresh token sirve para todos esos clientes: lo que cambia es el customer ID de cada Canal.')
                 ->modalSubmitActionLabel('Guardar y comprobar')
                 ->schema([
                     TextInput::make('refresh_token')
@@ -148,7 +148,7 @@ class EditCuenta extends EditRecord
                             $data['login_customer_id'] ?? null
                         );
 
-                        Notification::make()->title('Cuenta conectada con Google Ads')->success()->send();
+                        Notification::make()->title('Canal conectado con Google Ads')->success()->send();
                     } catch (Throwable $e) {
                         // Si el token no lee nada, la conexión no vale: se borra
                         // para no dejar una cuenta "conectada" que falla de noche.
@@ -203,7 +203,7 @@ class EditCuenta extends EditRecord
                     try {
                         app(OpenAiAdsConnector::class)->guardarApiKey($this->getRecord(), $data['api_key']);
 
-                        Notification::make()->title('Cuenta conectada con OpenAI Ads')->success()->send();
+                        Notification::make()->title('Canal conectado con OpenAI Ads')->success()->send();
                     } catch (Throwable $e) {
                         Notification::make()
                             ->title('No se pudo conectar')

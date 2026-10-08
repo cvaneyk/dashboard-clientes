@@ -23,7 +23,7 @@ class CuentasTable
                     ->label('Plataforma')
                     ->badge(),
                 TextColumn::make('nombre_cuenta')
-                    ->label('Cuenta')
+                    ->label('Canal')
                     ->searchable(),
                 TextColumn::make('conexionApi.metodo')
                     ->label('Datos')

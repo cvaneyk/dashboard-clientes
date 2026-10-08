@@ -102,7 +102,7 @@ class LineasTable
                     ->searchable()
                     ->preload(),
                 SelectFilter::make('cuenta_id')
-                    ->label('Cuenta')
+                    ->label('Canal')
                     ->relationship('cuenta', 'nombre_cuenta')
                     ->searchable()
                     ->preload(),

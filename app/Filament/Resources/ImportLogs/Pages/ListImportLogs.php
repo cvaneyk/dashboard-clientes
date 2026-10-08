@@ -27,7 +27,7 @@ class ListImportLogs extends ListRecords
                 // NOTA v5: si diera error, cambia ->schema( por ->form(
                 ->schema([
                     Select::make('cuenta_id')
-                        ->label('Cuenta')
+                        ->label('Canal')
                         ->options(fn () => Cuenta::query()->with('cliente')->get()
                             ->mapWithKeys(fn ($c) => [
                                 $c->id => trim(($c->cliente?->nombre ?? 'Sin cliente') . ' · ' . $c->plataforma . ' · ' . $c->nombre_cuenta),
