@@ -138,6 +138,7 @@ app/
   Console/Commands/PortalSync.php   ← php artisan portal:sync {--cuenta=} {--dias=3}
   Http/Controllers/
     DashboardController.php         ← exporta el dataset diario completo a JSON
+    GlobalesController.php          ← /globales: gasto unificado por canal o cliente (sección 7c)
     Auth/LoginController.php        ← login cliente; admin → /admin
     AccountController.php           ← /cuenta, cambio de contraseña del cliente
     Conexiones/MetaConexionController.php ← OAuth de Meta (autorizar + callback)
@@ -147,8 +148,8 @@ app/
                                       MetricaDiarias, ImportLogs, Users
   Models/                           ← Cliente, Cuenta, Linea, PresupuestoEvento,
                                       MetricaDiaria, Override, ImportLog, User, ConexionApi
-resources/views/portal/             ← dashboard.blade.php, login.blade.php, cuenta.blade.php
-routes/web.php                      ← /login, /dashboard, /cuenta, /media/logo/{cliente},
+resources/views/portal/             ← dashboard, globales, login, cuenta (.blade.php)
+routes/web.php                      ← /login, /dashboard, /globales, /cuenta, /media/logo/{cliente},
                                       /conexiones/{meta,google,linkedin,spotify}/{autorizar,callback}
 routes/console.php                  ← portal:sync diario a las 07:30 (Europe/Madrid)
 database/migrations/2026_08_11_*    ← tablas del portal + cliente_id/es_admin en users
@@ -420,6 +421,29 @@ con logos SVG inline, tabla de campañas con borde de color por canal, export CS
   reales sí se ven. No es un bug: falta el evento de presupuesto en la ficha de la Línea. Como la
   sincronización crea líneas solas, en `/admin → Líneas` hay columna "Objetivo cliente", filtro
   "Solo las que no tienen tramo vigente" y acción masiva "Asignar tramo de facturación".
+
+---
+
+## 7c. Gastos globales
+
+[GlobalesController](app/Http/Controllers/GlobalesController.php) +
+[globales.blade.php](resources/views/portal/globales.blade.php). Botón "Gastos globales" en la
+cabecera de los dos dashboards; también en el menú de Filament (la interna).
+
+- Suma **todas las líneas activas de los clientes de `User::clientesVisibles()`**, la misma regla
+  que el dashboard: el cliente ve los suyos, el admin todos. A diferencia del dashboard sí lleva
+  varios clientes en una página, así que las filas viajan **ya sumadas por día, cliente y canal**,
+  sin detalle de campaña.
+- Interruptor "Unificar por" **Canal / Cliente**, filtros por cliente y canal, y pinchar una fila
+  profundiza en la otra dimensión. El interruptor y el filtro de cliente solo salen con más de un
+  cliente visible: a un usuario de cliente le aparecerán solos si algún día tiene una cartera.
+- Dos vistas, como el dashboard: `/globales` solo con lo facturado ("Inversión") y
+  `/globales/interno` (solo admins) con **gasto real, facturado y margen**. En la del cliente la
+  clave `g` ni se envía, y las etiquetas de columna llegan del controlador para que el JS no
+  delate la vista interna.
+- Lo facturado sale de `PricingEngine::costeClienteMes()`, pedido solo para los meses con gasto o
+  con override por día (en el resto todo es 0 €), para que cuadre con el dashboard sin recorrer la
+  ventana entera de todos los clientes.
 
 ---
 

@@ -50,6 +50,10 @@ class AdminPanelProvider extends PanelProvider
                     ->url('/dashboard/interno', shouldOpenInNewTab: true)
                     ->icon('heroicon-o-eye-slash')
                     ->sort(100),
+                NavigationItem::make('Gastos globales (interno)')
+                    ->url('/globales/interno', shouldOpenInNewTab: true)
+                    ->icon('heroicon-o-banknotes')
+                    ->sort(101),
             ])
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\Filament\Widgets')
             ->widgets([
