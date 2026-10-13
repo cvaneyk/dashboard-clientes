@@ -104,6 +104,7 @@
 		.foot a{color:rgba(255,255,255,.75);text-decoration:none;font-size:.9rem;margin-left:18px}
 		.foot a:hover{color:var(--green)}
 		.foot__copy{font-size:.82rem;color:rgba(255,255,255,.5);margin-top:14px}
+		.foot__disclaimer{font-size:.75rem;color:rgba(255,255,255,.6);margin-top:16px;font-style:italic}
 		.empty{color:#9ca3af;text-align:center;padding:30px;font-size:.95rem}
 		@media print{
 			body{background:#fff}
@@ -272,6 +273,7 @@
 					<a href="https://olimedia.es/#contacto" target="_blank" rel="noopener">Contacto</a>
 				</div>
 			</div>
+			<div class="foot__disclaimer">* Datos de campaña sin Fee ni IVA</div>
 			<div class="foot__copy">© <span id="year"></span> OliMedia · Agencia de marketing y publicidad. Panel de rendimiento de campañas.</div>
 		</div>
 	</footer>

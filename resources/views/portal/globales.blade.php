@@ -74,6 +74,7 @@
 		.foot{margin-top:auto;background:var(--ink);color:rgba(255,255,255,.7);padding:34px 0 22px}
 		.foot .brand img{width:120px;height:auto}
 		.foot__copy{font-size:.82rem;color:rgba(255,255,255,.5);margin-top:14px}
+		.foot__disclaimer{font-size:.75rem;color:rgba(255,255,255,.6);margin-top:16px;font-style:italic}
 		.empty{color:#9ca3af;text-align:center;padding:30px;font-size:.95rem}
 		@media print{
 			body{background:#fff}
@@ -207,6 +208,7 @@
 	<footer class="foot">
 		<div class="wrap">
 			<div class="brand"><img src="https://olimedia.es/wp-content/themes/olimedia/assets/img/olimedia-logo.png" alt="OliMedia Agencia de Marketing"></div>
+			<div class="foot__disclaimer">* Datos de campaña sin Fee ni IVA</div>
 			<div class="foot__copy">© <span id="year"></span> OliMedia · Agencia de marketing y publicidad. Gastos globales.</div>
 		</div>
 	</footer>
