@@ -207,7 +207,7 @@
 
 	<footer class="foot">
 		<div class="wrap">
-			<div class="brand"><img src="https://olimedia.es/wp-content/themes/olimedia/assets/img/olimedia-logo.png" alt="OliMedia Agencia de Marketing"></div>
+			<div class="brand"><img src="https://olimedia.es/wp-content/uploads/2026/10/OLIMEDIA-Logotipo-principal-tagline-claro.png" alt="OliMedia Agencia de Marketing"></div>
 			<div class="foot__disclaimer">* Datos de campaña sin Fee ni IVA</div>
 			<div class="foot__copy">© <span id="year"></span> OliMedia · Agencia de marketing y publicidad. Gastos globales.</div>
 		</div>
