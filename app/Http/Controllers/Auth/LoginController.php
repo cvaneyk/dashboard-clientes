@@ -55,6 +55,14 @@ class LoginController extends Controller
     {
         $user = Auth::user();
 
+        // Agencia desactivada: fuera todos sus usuarios. Sin esto, un usuario
+        // de cliente rebotaría entre /dashboard (sin clientes) y /login.
+        if (! $user->agenciaActiva()) {
+            Auth::logout();
+            return redirect()->route('portal.login')
+                ->withErrors(['email' => 'El acceso de tu agencia está desactivado.']);
+        }
+
         if ($user->es_admin) {
             // Este login autentica el guard 'web'; el panel usa el guard 'admin'.
             // Sin esto, un admin que entra por /login llega a /admin y tiene que

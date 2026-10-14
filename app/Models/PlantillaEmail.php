@@ -2,7 +2,10 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\DeAgencia;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * Plantilla de email editable desde /admin → Plantillas de email.
@@ -14,6 +17,13 @@ use Illuminate\Database\Eloquent\Model;
  */
 class PlantillaEmail extends Model
 {
+    use DeAgencia;
+
+    protected static function filtrarPorAgencia(Builder $query, ?int $agenciaId): void
+    {
+        static::porColumnaAgencia($query, $agenciaId);
+    }
+
     public const INFORME_SEMANAL = 'informe_semanal';
     public const INFORME_ADMIN   = 'informe_admin';
 
@@ -52,11 +62,25 @@ class PlantillaEmail extends Model
     ];
 
     protected $table = 'plantillas_email';
-    protected $fillable = ['clave', 'nombre', 'asunto', 'cuerpo'];
+    protected $fillable = ['agencia_id', 'clave', 'nombre', 'asunto', 'cuerpo'];
 
-    public static function deClave(string $clave): self
+    public function agencia(): BelongsTo
     {
-        return static::where('clave', $clave)->firstOrFail();
+        return $this->belongsTo(Agencia::class);
+    }
+
+    /**
+     * Plantilla de una agencia; si esa agencia no tiene la suya (o no hay
+     * agencia), la plantilla por defecto, que es la que no tiene agencia.
+     * Sin global scope: la llaman también los procesos sin usuario.
+     */
+    public static function deClave(string $clave, ?int $agenciaId = null): self
+    {
+        return static::withoutGlobalScopes()
+            ->where('clave', $clave)
+            ->where(fn ($q) => $q->whereNull('agencia_id')->when($agenciaId, fn ($q) => $q->orWhere('agencia_id', $agenciaId)))
+            ->orderByRaw('agencia_id IS NULL')
+            ->firstOrFail();
     }
 
     /**

@@ -2,10 +2,19 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\DeAgencia;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
 class ImportLog extends Model
 {
+    use DeAgencia;
+
+    protected static function filtrarPorAgencia(Builder $query, ?int $agenciaId): void
+    {
+        $query->whereIn($query->qualifyColumn('cliente_id'), static::idsClientes($agenciaId));
+    }
+
     protected $table = 'import_logs';
     protected $fillable = [
         'cliente_id', 'plataforma', 'origen', 'fichero', 'periodo_inicio', 'periodo_fin',

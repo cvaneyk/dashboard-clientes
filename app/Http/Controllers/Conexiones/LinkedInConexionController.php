@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Conexiones;
 
 use App\Filament\Resources\Cuentas\CuentaResource;
 use App\Http\Controllers\Controller;
+use App\Models\Agencia;
 use App\Models\Cuenta;
 use App\Services\Sync\LinkedInConnector;
 use Illuminate\Http\RedirectResponse;
@@ -27,11 +28,14 @@ class LinkedInConexionController extends Controller
     {
         $cuenta = Cuenta::findOrFail($request->query('cuenta'));
 
+        // Las apps de API son de la agencia dueña de la cuenta.
+        Agencia::usarCredencialesDe($cuenta);
+
         if ($cuenta->plataforma !== 'linkedin') {
             return $this->volver(['cuenta_id' => $cuenta->id], 'error', 'Esa cuenta no es de LinkedIn Ads.');
         }
         if (! $connector->appConfigurada()) {
-            return $this->volver(['cuenta_id' => $cuenta->id], 'error', 'Falta configurar LinkedIn en el .env del servidor: LINKEDIN_ADS_CLIENT_ID y LINKEDIN_ADS_CLIENT_SECRET.');
+            return $this->volver(['cuenta_id' => $cuenta->id], 'error', 'Falta configurar la app de LinkedIn (client ID y client secret) de esta agencia en /admin → Mi agencia.');
         }
         if (trim((string) $cuenta->external_id) === '') {
             return $this->volver(['cuenta_id' => $cuenta->id], 'error', 'Antes de conectar, rellena el "ID de cuenta en la plataforma" (el número de la cuenta publicitaria).');
@@ -65,6 +69,8 @@ class LinkedInConexionController extends Controller
         if (! $cuenta || $cuenta->plataforma !== 'linkedin') {
             return $this->volver($estado, 'error', 'La cuenta a conectar ya no existe.');
         }
+
+        Agencia::usarCredencialesDe($cuenta);
 
         try {
             $connector->guardarTokenOauth($cuenta, (string) $request->query('code', ''), route('conexiones.linkedin.callback'));

@@ -2,7 +2,9 @@
 
 namespace App\Filament\Resources\Clientes\Schemas;
 
+use App\Support\AgenciaActual;
 use Filament\Forms\Components\ColorPicker;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
@@ -15,6 +17,15 @@ class ClienteForm
     {
         return $schema
             ->components([
+                // Solo el superadmin elige agencia; para el admin de una agencia
+                // el cliente es de la suya (Cliente::creating).
+                Select::make('agencia_id')
+                    ->label('Agencia')
+                    ->relationship('agencia', 'nombre')
+                    ->searchable()
+                    ->preload()
+                    ->required()
+                    ->visible(fn () => AgenciaActual::esSuperadmin()),
                 TextInput::make('nombre')
                     ->label('Nombre')
                     ->required()

@@ -2,6 +2,7 @@
 
 namespace App\Mail;
 
+use App\Models\Agencia;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
@@ -21,6 +22,8 @@ class InformeMail extends Mailable
         public string $asunto,
         public string $cuerpo,
         public ?string $color = null,
+        // Agencia cuya marca lleva el email (null = la de la plataforma).
+        public ?int $agenciaId = null,
     ) {}
 
     /**
@@ -39,6 +42,6 @@ class InformeMail extends Mailable
 
     public function content(): Content
     {
-        return new Content(view: 'emails.informe');
+        return new Content(view: 'emails.informe', with: ['marca' => Agencia::marcaDe($this->agenciaId)]);
     }
 }

@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Clientes\Tables;
 use App\Mail\InformeMail;
 use App\Models\Cliente;
 use App\Services\Informes\InformesSemanales;
+use App\Support\AgenciaActual;
 use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
@@ -30,6 +31,10 @@ class ClientesTable
                 TextColumn::make('slug')
                     ->label('Slug')
                     ->searchable(),
+                TextColumn::make('agencia.nombre')
+                    ->label('Agencia')
+                    ->sortable()
+                    ->visible(fn () => AgenciaActual::esSuperadmin()),
                 TextColumn::make('lineas_count')
                     ->label('Líneas')
                     ->counts('lineas')
@@ -84,7 +89,7 @@ class ClientesTable
                         }
                         try {
                             $informe = $informes->paraCliente($record, ...InformesSemanales::semanaAnterior());
-                            Mail::to($destinos)->send(new InformeMail($informe['asunto'], $informe['cuerpo'], $record->color));
+                            Mail::to($destinos)->send(new InformeMail($informe['asunto'], $informe['cuerpo'], $record->color, $record->agencia_id));
                             Notification::make()
                                 ->title('Informe enviado a ' . implode(', ', $destinos))
                                 ->body($informe['sin_actividad'] ? 'Ojo: el cliente no tuvo actividad esa semana.' : null)

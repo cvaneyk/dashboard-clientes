@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Cuentas\Pages;
 
 use App\Filament\Resources\Cuentas\CuentaResource;
+use App\Models\Agencia;
 use App\Models\ConexionApi;
 use App\Services\Sync\Conectores;
 use App\Services\Sync\GoogleAdsConnector;
@@ -138,9 +139,13 @@ class EditCuenta extends EditRecord
                         ->required(),
                     TextInput::make('login_customer_id')
                         ->label('ID de la MCC (opcional)')
-                        ->helperText('Solo si es distinto del configurado en el servidor. Con o sin guiones.'),
+                        ->helperText('Solo si es distinto del configurado en la agencia. Con o sin guiones.'),
                 ])
                 ->action(function (array $data): void {
+                    // Apps de Google de la agencia dueña de la cuenta (el
+                    // superadmin puede estar editando la de otra agencia).
+                    Agencia::usarCredencialesDe($this->getRecord());
+
                     try {
                         app(GoogleAdsConnector::class)->guardarRefreshToken(
                             $this->getRecord(),

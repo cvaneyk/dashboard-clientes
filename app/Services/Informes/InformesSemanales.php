@@ -2,6 +2,7 @@
 
 namespace App\Services\Informes;
 
+use App\Models\Agencia;
 use App\Models\Cliente;
 use App\Models\Cuenta;
 use App\Models\MetricaDiaria;
@@ -80,23 +81,27 @@ class InformesSemanales
             'tabla_canales' => $this->tablaCanales($canales),
         ];
 
-        $render = PlantillaEmail::deClave(PlantillaEmail::INFORME_SEMANAL)->render($texto, $html);
+        // Los textos de la agencia del cliente (o los por defecto).
+        $render = PlantillaEmail::deClave(PlantillaEmail::INFORME_SEMANAL, $cliente->agencia_id)->render($texto, $html);
 
         return $render + [
             'sin_actividad' => $actual['coste'] == 0 && $actual['clics'] == 0 && $actual['impresiones'] == 0,
+            'agencia_id'    => $cliente->agencia_id,
         ];
     }
 
     /**
-     * Resumen interno de todas las cuentas. Aquí SÍ va el gasto real y el
-     * margen: es para el account manager, nunca para un cliente.
+     * Resumen interno de las cuentas de UNA agencia (null = las que no tienen
+     * agencia). Aquí SÍ va el gasto real y el margen: es para el account
+     * manager de esa agencia, nunca para un cliente ni para otra agencia.
      *
-     * @return array{asunto:string,cuerpo:string}
+     * @return array{asunto:string,cuerpo:string,agencia_id:?int}
      */
-    public function paraAdmin(Carbon $desde, Carbon $hasta): array
+    public function paraAdmin(Carbon $desde, Carbon $hasta, ?int $agenciaId = null): array
     {
+        // where(col, null) es "IS NULL": sin agencia, solo los clientes sin agencia.
         $cuentas = Cuenta::with(['cliente', 'conexionApi', 'lineas.presupuestoEventos'])
-            ->whereHas('cliente', fn ($q) => $q->where('activo', true))
+            ->whereHas('cliente', fn ($q) => $q->where('activo', true)->where('agencia_id', $agenciaId))
             ->get()
             ->sortBy(fn (Cuenta $c) => $c->cliente->nombre . ' ' . $c->plataforma);
 
@@ -161,7 +166,7 @@ class InformesSemanales
         foreach ($sinMargen as $s) {
             $avisos[] = 'Gasto sin margen aplicado: ' . $s;
         }
-        foreach (Cliente::where('activo', true)->where('informe_semanal', true)->get() as $c) {
+        foreach (Cliente::where('activo', true)->where('informe_semanal', true)->where('agencia_id', $agenciaId)->get() as $c) {
             if (! $c->emailsInforme()) {
                 $avisos[] = 'El cliente ' . $c->nombre . ' tiene el informe semanal activado pero ningún email válido.';
             }
@@ -184,20 +189,27 @@ class InformesSemanales
                 : '<p>Sin avisos esta semana.</p>',
         ];
 
-        return PlantillaEmail::deClave(PlantillaEmail::INFORME_ADMIN)->render($texto, $html);
+        return PlantillaEmail::deClave(PlantillaEmail::INFORME_ADMIN, $agenciaId)->render($texto, $html)
+            + ['agencia_id' => $agenciaId];
     }
 
     /**
-     * Destinatarios del resumen interno: INFORME_ADMIN_EMAIL en .env si existe
-     * (uno o varios, separados por coma); si no, todos los usuarios admin.
+     * Destinatarios del resumen interno de una agencia: el email de informes de
+     * su ficha (uno o varios); si no tiene, sus usuarios admin. Sin agencia
+     * (instalación anterior a las agencias): INFORME_ADMIN_EMAIL del .env o,
+     * si está vacío, los admins sin agencia.
      *
      * @return list<string>
      */
-    public static function destinatariosAdmin(): array
+    public static function destinatariosAdmin(?int $agenciaId = null): array
     {
-        $config = Cliente::separarEmails(config('services.informes.admin'));
+        $configurados = $agenciaId
+            ? (string) Agencia::withoutGlobalScopes()->whereKey($agenciaId)->value('email_informes')
+            : config('services.informes.admin');
 
-        return $config ?: User::where('es_admin', true)->pluck('email')
+        return Cliente::separarEmails($configurados) ?: User::where('es_admin', true)
+            ->where('agencia_id', $agenciaId)
+            ->pluck('email')
             ->filter(fn ($e) => filter_var($e, FILTER_VALIDATE_EMAIL))
             ->values()
             ->all();

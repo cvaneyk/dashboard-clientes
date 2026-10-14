@@ -38,7 +38,11 @@ class EditPlantillaEmail extends EditRecord
                     $esCliente()
                         ? Select::make('cliente_id')
                             ->label('Con los datos de')
-                            ->options(Cliente::where('activo', true)->orderBy('nombre')->pluck('nombre', 'id'))
+                            // Clientes de la agencia de ESTA plantilla: paraCliente() usa
+                            // los textos de la agencia del cliente elegido.
+                            ->options(Cliente::where('activo', true)
+                                ->where('agencia_id', $this->getRecord()->agencia_id)
+                                ->orderBy('nombre')->pluck('nombre', 'id'))
                             ->required()
                         : null,
                     TextInput::make('para')
@@ -55,10 +59,11 @@ class EditPlantillaEmail extends EditRecord
                         if ($esCliente()) {
                             $cliente = Cliente::findOrFail($data['cliente_id']);
                             $informe = $informes->paraCliente($cliente, ...$semana);
-                            $mail    = new InformeMail($informe['asunto'], $informe['cuerpo'], $cliente->color);
+                            $mail    = new InformeMail($informe['asunto'], $informe['cuerpo'], $cliente->color, $cliente->agencia_id);
                         } else {
-                            $informe = $informes->paraAdmin(...$semana);
-                            $mail    = new InformeMail($informe['asunto'], $informe['cuerpo']);
+                            $agenciaId = $this->getRecord()->agencia_id;
+                            $informe   = $informes->paraAdmin(...$semana, agenciaId: $agenciaId);
+                            $mail      = new InformeMail($informe['asunto'], $informe['cuerpo'], null, $agenciaId);
                         }
 
                         Mail::to($data['para'])->send($mail);

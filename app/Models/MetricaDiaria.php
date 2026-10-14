@@ -2,11 +2,20 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\DeAgencia;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class MetricaDiaria extends Model
 {
+    use DeAgencia;
+
+    protected static function filtrarPorAgencia(Builder $query, ?int $agenciaId): void
+    {
+        $query->whereIn($query->qualifyColumn('cliente_id'), static::idsClientes($agenciaId));
+    }
+
     protected $table = 'metricas_diarias';
     protected $fillable = [
         'cliente_id', 'cuenta_id', 'linea_id', 'plataforma', 'match_key',

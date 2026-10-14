@@ -96,11 +96,44 @@ Copia el patrón de un recurso existente antes de inventar; es la fuente de verd
 Así un admin y un cliente pueden estar logueados a la vez sin pisarse la sesión. El
 "403 Forbidden intermitente" era colisión de sesión, no el servidor. **No unifiques los guards.**
 
-Tipos de usuario (`users.cliente_id`, `users.es_admin`):
+Tipos de usuario (`users.agencia_id`, `users.cliente_id`, `users.es_admin`, `users.es_superadmin`):
 
-- **Admin / account manager**: `es_admin = true`, `cliente_id = null` → panel `/admin`, y además
-  puede abrir `/dashboard` y cambiar de cliente con el selector (sección 7).
-- **Cliente**: `cliente_id = X` → solo ve el dashboard de SU cliente.
+- **Superadmin** (quien opera la plataforma): `es_superadmin = true` → ve TODAS las agencias, las
+  crea en `/admin → Agencias` (con su primer admin) y las activa/desactiva.
+- **Admin / account manager de una agencia**: `es_admin = true`, `agencia_id = X` → panel `/admin`
+  con solo los datos de su agencia; puede abrir `/dashboard` y cambiar entre SUS clientes.
+- **Cliente**: `cliente_id = X` → solo ve el dashboard de SU cliente. Su `agencia_id` se copia del
+  cliente al guardar.
+
+---
+
+## 3b. Varias agencias en una instalación (aislamiento)
+
+Una misma instalación sirve a varias agencias. **Toda la seguridad entre agencias pasa por
+[AgenciaActual](app/Support/AgenciaActual.php)** y el trait
+[DeAgencia](app/Models/Concerns/DeAgencia.php), un global scope en `Agencia`, `Cliente`, `Cuenta`,
+`Linea`, `MetricaDiaria`, `ImportLog`, `PresupuestoEvento`, `Override`, `ConexionApi` y
+`PlantillaEmail`. Reglas:
+
+- Solo `clientes` (y `plantillas_email`) llevan `agencia_id`; el resto se filtra por subconsulta a
+  través del cliente. **Un modelo nuevo con datos de cliente tiene que usar `DeAgencia`.**
+- Sin usuario (scheduler, comandos) o con superadmin **no hay filtro**: los procesos automáticos
+  recorren todas las agencias y filtran ellos mismos (p. ej. el resumen interno, uno por agencia).
+- `User` **no** lleva global scope (lo usa la autenticación): el aislamiento de usuarios está en
+  `UserResource::getEloquentQuery()` y `User::clientesVisibles()` filtra explícitamente.
+- Al crear, `Cliente` y `User` toman la agencia del admin que los crea (no se puede colar otra).
+- **Apps de API por agencia**: cifradas en `agencias.credenciales`. `Agencia::usarCredenciales()`
+  las carga en `config('services.*')`, así los conectores no saben de agencias. Se cargan en el
+  middleware [AplicarAgencia](app/Http/Middleware/AplicarAgencia.php) (agencia del usuario) y,
+  para una cuenta concreta, en `Conectores::para()` y los controladores OAuth (agencia dueña de la
+  cuenta). Lo que una agencia no tenga queda **vacío**: nunca hereda las del `.env`.
+- **Marca por agencia** (nombre, logo, web, eslogan): `AplicarAgencia` la pone en `config('marca.*')`;
+  el dashboard usa la de la agencia del cliente que pinta y los emails la reciben en `InformeMail`.
+  `MARCA_*` del `.env` queda como marca de la plataforma (login).
+- Una agencia desactivada deja fuera a sus admins y a sus clientes y no recibe informes. Con
+  clientes o usuarios no se puede borrar (FK `RESTRICT`).
+- Tests: [AgenciasTest](tests/Feature/AgenciasTest.php). Si tocas el scope, deben fallar al
+  quitarlo.
 
 Las rutas del portal usan `auth:web,admin` (dos guards admitidos, **no unificados**): el cliente
 entra por `/login` con el guard `web` y el admin llega desde Filament con el guard `admin`. Las

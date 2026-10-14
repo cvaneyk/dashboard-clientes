@@ -8,11 +8,13 @@ use App\Filament\Resources\Users\Pages\ListUsers;
 use App\Filament\Resources\Users\Schemas\UserForm;
 use App\Filament\Resources\Users\Tables\UsersTable;
 use App\Models\User;
+use App\Support\AgenciaActual;
 use BackedEnum;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 
 class UserResource extends Resource
 {
@@ -34,6 +36,23 @@ class UserResource extends Resource
     public static function table(Table $table): Table
     {
         return UsersTable::configure($table);
+    }
+
+    /**
+     * User no lleva global scope (lo usa la autenticación, que no puede depender
+     * de quién está autenticado), así que el aislamiento por agencia va aquí:
+     * el admin de una agencia ve solo los usuarios de la suya y nunca a un
+     * superadmin.
+     */
+    public static function getEloquentQuery(): Builder
+    {
+        $query = parent::getEloquentQuery();
+
+        if (AgenciaActual::filtra()) {
+            $query->where('agencia_id', AgenciaActual::id())->where('es_superadmin', false);
+        }
+
+        return $query;
     }
 
     public static function getRelations(): array

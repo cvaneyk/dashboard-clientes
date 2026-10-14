@@ -2,6 +2,7 @@
 
 namespace App\Services\Sync;
 
+use App\Models\Agencia;
 use App\Models\Cuenta;
 use RuntimeException;
 
@@ -18,6 +19,11 @@ class Conectores
 
     public static function para(Cuenta $cuenta): Conector
     {
+        // Las apps de API son de cada agencia: se cargan las de la dueña de
+        // esta cuenta antes de devolver el conector (el scheduler recorre
+        // cuentas de varias agencias en el mismo proceso).
+        Agencia::usarCredencialesDe($cuenta);
+
         return match ($cuenta->plataforma) {
             'meta'     => app(MetaConnector::class),
             'google'   => app(GoogleAdsConnector::class),

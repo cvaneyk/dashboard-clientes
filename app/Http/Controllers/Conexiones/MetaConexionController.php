@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Conexiones;
 
 use App\Filament\Resources\Cuentas\CuentaResource;
 use App\Http\Controllers\Controller;
+use App\Models\Agencia;
 use App\Models\Cuenta;
 use App\Services\Sync\MetaConnector;
 use Illuminate\Http\RedirectResponse;
@@ -29,12 +30,15 @@ class MetaConexionController extends Controller
     {
         $cuenta = Cuenta::findOrFail($request->query('cuenta'));
 
+        // Las apps de API son de la agencia dueña de la cuenta.
+        Agencia::usarCredencialesDe($cuenta);
+
         // Los problemas vuelven a la ficha como notificación, no como página de error.
         if ($cuenta->plataforma !== 'meta') {
             return $this->volver(['cuenta_id' => $cuenta->id], 'error', 'Esa cuenta no es de Meta.');
         }
         if (! $connector->appConfigurada()) {
-            return $this->volver(['cuenta_id' => $cuenta->id], 'error', 'Falta configurar la app de Meta: META_APP_ID y META_APP_SECRET en el .env del servidor.');
+            return $this->volver(['cuenta_id' => $cuenta->id], 'error', 'Falta configurar la app de Meta (App ID y App Secret) de esta agencia en /admin → Mi agencia.');
         }
         if (trim((string) $cuenta->external_id) === '') {
             return $this->volver(['cuenta_id' => $cuenta->id], 'error', 'Antes de conectar, rellena el "ID de cuenta en la plataforma" en la ficha de la Cuenta.');
@@ -71,6 +75,8 @@ class MetaConexionController extends Controller
         if (! $cuenta || $cuenta->plataforma !== 'meta') {
             return $this->volver($estado, 'error', 'La cuenta a conectar ya no existe.');
         }
+
+        Agencia::usarCredencialesDe($cuenta);
 
         try {
             $connector->guardarTokenOauth($cuenta, (string) $request->query('code', ''), route('conexiones.meta.callback'));

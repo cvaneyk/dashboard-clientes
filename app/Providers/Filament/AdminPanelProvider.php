@@ -2,6 +2,7 @@
 
 namespace App\Providers\Filament;
 
+use App\Http\Middleware\AplicarAgencia;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -31,9 +32,11 @@ class AdminPanelProvider extends PanelProvider
             ->authGuard('admin')
             ->login()
             ->profile()
-            // Marca de la instalación (config/marca.php); sin logo, Filament pinta el nombre.
-            ->brandName(config('marca.nombre'))
-            ->brandLogo(config('marca.logo'))
+            // Marca de la agencia del admin (la carga AplicarAgencia en config);
+            // en funciones para que se lea en cada petición y no al arrancar.
+            // Sin logo, Filament pinta el nombre.
+            ->brandName(fn () => config('marca.nombre'))
+            ->brandLogo(fn () => config('marca.logo'))
             ->colors([
                 'primary' => Color::Amber,
             ])
@@ -74,8 +77,11 @@ class AdminPanelProvider extends PanelProvider
                 DisableBladeIconComponents::class,
                 DispatchServingFilamentEvent::class,
             ])
+            // Persistente: también en las peticiones Livewire (acciones, tablas),
+            // que es donde se conectan cuentas y se lanzan sincronizaciones.
             ->authMiddleware([
                 Authenticate::class,
-            ]);
+                AplicarAgencia::class,
+            ], isPersistent: true);
     }
 }

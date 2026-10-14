@@ -2,8 +2,11 @@
 
 namespace App\Filament\Resources\Users\Schemas;
 
+use App\Support\AgenciaActual;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 
 class UserForm
@@ -22,7 +25,25 @@ class UserForm
                     ->default('0')
                     ->formatStateUsing(fn ($state) => $state ? '1' : '0')
                     ->required()
+                    ->live()
                     ->helperText('Define a qué parte del sistema accede este usuario.'),
+                // Solo el superadmin elige agencia (y puede crear otros
+                // superadmins). Para el admin de una agencia, los usuarios que
+                // crea son de la suya (User::creating); los de cliente, de la
+                // agencia de su cliente (User::saving).
+                Select::make('agencia_id')
+                    ->label('Agencia')
+                    ->relationship('agencia', 'nombre')
+                    ->searchable()
+                    ->preload()
+                    ->required(fn (Get $get) => $get('es_admin') === '1' && ! $get('es_superadmin'))
+                    ->helperText('Para administradores. Los usuarios de cliente toman la agencia de su cliente.')
+                    ->visible(fn () => AgenciaActual::esSuperadmin()),
+                Toggle::make('es_superadmin')
+                    ->label('Superadmin de la plataforma')
+                    ->helperText('Ve y gestiona TODAS las agencias. Solo para quien opera la plataforma.')
+                    ->live()
+                    ->visible(fn () => AgenciaActual::esSuperadmin()),
                 TextInput::make('name')
                     ->label('Nombre')
                     ->required(),

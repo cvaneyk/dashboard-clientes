@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Conexiones;
 
 use App\Filament\Resources\Cuentas\CuentaResource;
 use App\Http\Controllers\Controller;
+use App\Models\Agencia;
 use App\Models\Cuenta;
 use App\Services\Sync\GoogleAdsConnector;
 use Illuminate\Http\RedirectResponse;
@@ -28,11 +29,14 @@ class GoogleConexionController extends Controller
     {
         $cuenta = Cuenta::findOrFail($request->query('cuenta'));
 
+        // Las apps de API son de la agencia dueña de la cuenta.
+        Agencia::usarCredencialesDe($cuenta);
+
         if ($cuenta->plataforma !== 'google') {
             return $this->volver(['cuenta_id' => $cuenta->id], 'error', 'Esa cuenta no es de Google Ads.');
         }
         if (! $connector->appConfigurada()) {
-            return $this->volver(['cuenta_id' => $cuenta->id], 'error', 'Falta configurar Google en el .env del servidor: GOOGLE_ADS_CLIENT_ID, GOOGLE_ADS_CLIENT_SECRET y GOOGLE_ADS_DEVELOPER_TOKEN.');
+            return $this->volver(['cuenta_id' => $cuenta->id], 'error', 'Falta configurar Google Ads (client ID, client secret y developer token) de esta agencia en /admin → Mi agencia.');
         }
         if (trim((string) $cuenta->external_id) === '') {
             return $this->volver(['cuenta_id' => $cuenta->id], 'error', 'Antes de conectar, rellena el "ID de cuenta en la plataforma" (el customer ID de 10 cifras).');
@@ -66,6 +70,8 @@ class GoogleConexionController extends Controller
         if (! $cuenta || $cuenta->plataforma !== 'google') {
             return $this->volver($estado, 'error', 'La cuenta a conectar ya no existe.');
         }
+
+        Agencia::usarCredencialesDe($cuenta);
 
         try {
             $connector->guardarTokenOauth($cuenta, (string) $request->query('code', ''), route('conexiones.google.callback'));

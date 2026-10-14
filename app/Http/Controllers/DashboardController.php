@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Cliente;
 use App\Models\Cuenta;
 use App\Models\MetricaDiaria;
+use App\Models\Agencia;
 use App\Services\PricingEngine;
 use Carbon\Carbon;
 use Carbon\CarbonPeriod;
@@ -63,6 +64,12 @@ class DashboardController extends Controller
         }
 
         $cliente = $this->clienteSeleccionado($request, $visibles);
+
+        // Marca de la agencia de ESE cliente: el superadmin puede estar viendo
+        // el dashboard de un cliente de otra agencia.
+        if ($cliente->agencia_id) {
+            Agencia::withoutGlobalScopes()->find($cliente->agencia_id)?->aplicarMarca();
+        }
 
         // Con los presupuestos cargados: los necesitan los medidores de objetivo
         // y sin esto sería una consulta por línea.

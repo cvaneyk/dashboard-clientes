@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\DeAgencia;
+use Illuminate\Database\Eloquent\Builder;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Model;
@@ -11,6 +13,13 @@ use Illuminate\Support\Str;
 
 class Linea extends Model
 {
+    use DeAgencia;
+
+    protected static function filtrarPorAgencia(Builder $query, ?int $agenciaId): void
+    {
+        $query->whereIn($query->qualifyColumn('cliente_id'), static::idsClientes($agenciaId));
+    }
+
     protected $table = 'lineas';
     protected $fillable = [
         'cliente_id', 'cuenta_id', 'plataforma', 'nombre',

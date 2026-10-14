@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\DeAgencia;
+use Illuminate\Database\Eloquent\Builder;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -15,6 +17,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class PresupuestoEvento extends Model
 {
+    use DeAgencia;
+
+    protected static function filtrarPorAgencia(Builder $query, ?int $agenciaId): void
+    {
+        $query->whereIn($query->qualifyColumn('linea_id'), static::idsLineas($agenciaId));
+    }
+
     protected $table = 'presupuesto_eventos';
     protected $fillable = ['linea_id', 'desde', 'hasta', 'porcentaje', 'estado', 'nota'];
     protected $casts = [

@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\DeAgencia;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -9,6 +11,13 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Cuenta extends Model
 {
+    use DeAgencia;
+
+    protected static function filtrarPorAgencia(Builder $query, ?int $agenciaId): void
+    {
+        $query->whereIn($query->qualifyColumn('cliente_id'), static::idsClientes($agenciaId));
+    }
+
     /**
      * Plataformas que puede tener una cuenta, con su nombre visible.
      *

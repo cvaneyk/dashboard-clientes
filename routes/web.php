@@ -8,6 +8,8 @@ use App\Http\Controllers\Conexiones\MetaConexionController;
 use App\Http\Controllers\Conexiones\SpotifyConexionController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\GlobalesController;
+use App\Http\Middleware\AplicarAgencia;
+use App\Models\Agencia;
 use App\Models\Cliente;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
@@ -22,6 +24,18 @@ Route::get('/media/logo/{cliente}', function (Cliente $cliente) {
     return response()->file($disk->path($cliente->logo));
 })->name('cliente.logo');
 
+// Logo de la agencia (dashboard, panel y emails). Público, como el del cliente:
+// lo piden también los clientes de correo, que no tienen sesión.
+Route::get('/media/agencia/{agencia}/{tipo}', function (int $agencia, string $tipo) {
+    abort_unless(in_array($tipo, ['logo', 'logo_pie'], true), 404);
+    $ruta = Agencia::withoutGlobalScopes()->findOrFail($agencia)->{$tipo};
+    abort_unless($ruta && ! str_starts_with($ruta, 'http'), 404);
+    $disk = Storage::disk('public');
+    abort_unless($disk->exists($ruta), 404);
+
+    return response()->file($disk->path($ruta));
+})->whereNumber('agencia')->name('agencia.logo');
+
 // Login del portal de clientes.
 Route::get('/login', [LoginController::class, 'show'])->name('portal.login');
 Route::post('/login', [LoginController::class, 'login'])->name('portal.login.attempt');
@@ -34,7 +48,7 @@ Route::post('/logout', [LoginController::class, 'logout'])->name('portal.logout'
 // tiene que poder abrir el dashboard para verlo como lo ve el cliente. Los
 // guards siguen separados —sesiones independientes, que es lo que arregló el
 // 403—; lo único que se hace aquí es admitir cualquiera de los dos.
-Route::middleware('auth:web,admin')->group(function () {
+Route::middleware(['auth:web,admin', AplicarAgencia::class])->group(function () {
     Route::get('/', function () {
         // Los admin van a Filament; los clientes al dashboard.
         return Auth::user()->es_admin
@@ -63,7 +77,7 @@ Route::middleware('auth:web,admin')->group(function () {
 // Conexión OAuth de las APIs de anuncios: la lanza el admin desde la ficha de
 // una Cuenta y la plataforma vuelve al callback. Guard 'admin' porque la sesión
 // de la conexión viaja con el admin que la inicia.
-Route::middleware('auth:admin')->group(function () {
+Route::middleware(['auth:admin', AplicarAgencia::class])->group(function () {
     Route::get('/conexiones/meta/autorizar', [MetaConexionController::class, 'autorizar'])
         ->name('conexiones.meta.autorizar');
     Route::get('/conexiones/meta/callback', [MetaConexionController::class, 'callback'])

@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Mail\InformeMail;
+use App\Models\Agencia;
 use App\Models\Cliente;
 use App\Services\Informes\InformesSemanales;
 use Carbon\Carbon;
@@ -67,7 +68,11 @@ class PortalInformes extends Command
 
         $clientes = $filtro
             ? Cliente::where('id', $filtro)->orWhere('slug', $filtro)->get()
-            : Cliente::where('activo', true)->where('informe_semanal', true)->get();
+            : Cliente::where('activo', true)->where('informe_semanal', true)
+                // Una agencia desactivada deja de enviar a sus clientes.
+                ->where(fn ($q) => $q->whereNull('agencia_id')
+                    ->orWhereIn('agencia_id', Agencia::where('activo', true)->select('id')))
+                ->get();
 
         if ($filtro && $clientes->isEmpty()) {
             $this->error("No existe el cliente {$filtro}");
@@ -99,7 +104,7 @@ class PortalInformes extends Command
                     continue;
                 }
 
-                Mail::to($destinos)->send(new InformeMail($informe['asunto'], $informe['cuerpo'], $cliente->color));
+                Mail::to($destinos)->send(new InformeMail($informe['asunto'], $informe['cuerpo'], $cliente->color, $cliente->agencia_id));
 
                 if (! $para) {
                     $cliente->forceFill(['ultimo_informe_en' => now()])->save();
@@ -116,23 +121,45 @@ class PortalInformes extends Command
         return $fallos;
     }
 
+    /**
+     * Un resumen interno por agencia activa, cada uno solo con sus cuentas y a
+     * sus destinatarios. Si quedan clientes sin agencia (instalación anterior
+     * a las agencias), van en un resumen aparte para los admins sin agencia.
+     */
     private function enviarAdmin(InformesSemanales $informes, Carbon $desde, Carbon $hasta, ?string $para): int
     {
-        $destinos = $para ? [$para] : InformesSemanales::destinatariosAdmin();
+        $grupos = Agencia::where('activo', true)->orderBy('nombre')->pluck('nombre', 'id')->all();
+
+        $fallos = 0;
+
+        foreach ($grupos as $agenciaId => $nombre) {
+            $fallos += $this->enviarResumen($informes, $desde, $hasta, $para, $agenciaId, "Resumen interno de {$nombre}");
+        }
+
+        if (Cliente::whereNull('agencia_id')->exists()) {
+            $fallos += $this->enviarResumen($informes, $desde, $hasta, $para, null, 'Resumen interno');
+        }
+
+        return $fallos;
+    }
+
+    private function enviarResumen(InformesSemanales $informes, Carbon $desde, Carbon $hasta, ?string $para, ?int $agenciaId, string $etiqueta): int
+    {
+        $destinos = $para ? [$para] : InformesSemanales::destinatariosAdmin($agenciaId);
 
         if (! $destinos) {
-            $this->warn('Resumen interno: no hay destinatarios (INFORME_ADMIN_EMAIL ni usuarios admin con email válido).');
+            $this->warn("{$etiqueta}: no hay destinatarios (ni email de informes ni usuarios admin con email válido).");
             return 0;
         }
 
         try {
-            $informe = $informes->paraAdmin($desde, $hasta);
-            Mail::to($destinos)->send(new InformeMail($informe['asunto'], $informe['cuerpo']));
-            $this->info('Resumen interno: enviado a ' . implode(', ', $destinos));
+            $informe = $informes->paraAdmin($desde, $hasta, $agenciaId);
+            Mail::to($destinos)->send(new InformeMail($informe['asunto'], $informe['cuerpo'], null, $agenciaId));
+            $this->info("{$etiqueta}: enviado a " . implode(', ', $destinos));
 
             return 0;
         } catch (Throwable $e) {
-            $this->error('Resumen interno: ' . $e->getMessage());
+            $this->error("{$etiqueta}: " . $e->getMessage());
             report($e);
 
             return 1;

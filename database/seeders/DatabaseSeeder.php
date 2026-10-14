@@ -48,6 +48,8 @@ class DatabaseSeeder extends Seeder
             'email'    => $email,
             'password' => Hash::make($password),
             'es_admin' => true,
+            // Quien despliega opera la plataforma: crea las agencias desde /admin.
+            'es_superadmin' => true,
         ]);
 
         $this->command?->warn('Usuario admin creado: ' . $email);
