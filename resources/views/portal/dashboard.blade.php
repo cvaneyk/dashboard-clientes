@@ -123,7 +123,7 @@
 					<img class="clogo" src="{{ $logoUrl }}" alt="{{ $cliente->nombre }}">
 				@endif
 				<div>
-					<div class="brand"><img src="https://olimedia.es/wp-content/themes/olimedia/assets/img/olimedia-logo.png" alt="OliMedia Agencia de Marketing"></div>
+					@include('portal.partials.marca')
 					<div class="client">{{ $cliente->nombre }}</div>
 				</div>
 			</div>
@@ -266,15 +266,15 @@
 	<footer class="foot">
 		<div class="wrap">
 			<div class="foot__row">
-				<div class="brand"><img src="https://olimedia.es/wp-content/uploads/2026/10/OLIMEDIA-Logotipo-principal-tagline-claro.png" alt="OliMedia Agencia de Marketing"></div>
-				<div>
-					<a href="https://olimedia.es" target="_blank" rel="noopener">olimedia.es</a>
-					<a href="https://olimedia.es/servicios/" target="_blank" rel="noopener">Servicios</a>
-					<a href="https://olimedia.es/#contacto" target="_blank" rel="noopener">Contacto</a>
-				</div>
+				@include('portal.partials.marca', ['pie' => true])
+				@if (config('marca.web'))
+					<div>
+						<a href="{{ config('marca.web') }}" target="_blank" rel="noopener">{{ preg_replace('#^https?://(www\.)?#', '', rtrim(config('marca.web'), '/')) }}</a>
+					</div>
+				@endif
 			</div>
 			<div class="foot__disclaimer">* Datos de campaña sin Fee ni IVA</div>
-			<div class="foot__copy">© <span id="year"></span> OliMedia · Agencia de marketing y publicidad. Panel de rendimiento de campañas.</div>
+			<div class="foot__copy">© <span id="year"></span> {{ config('marca.nombre') }}{{ config('marca.eslogan') ? ' · '.config('marca.eslogan') : '' }}. Panel de rendimiento de campañas.</div>
 		</div>
 	</footer>
 

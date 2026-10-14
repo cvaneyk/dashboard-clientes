@@ -12,7 +12,13 @@
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:680px;background:#ffffff;border-radius:8px;overflow:hidden;">
         <tr>
           <td style="padding:20px 24px;border-bottom:4px solid {{ $color ?: '#111827' }};">
-            <img src="https://olimedia.es/wp-content/themes/olimedia/assets/img/olimedia-logo.png" alt="OliMedia" height="32" style="display:block;height:32px;">
+            @php($logoMarca = config('marca.logo'))
+            {{-- En un email la ruta tiene que ser absoluta: /img/logo.png no lo resuelve ningún cliente de correo. --}}
+            @if ($logoMarca)
+              <img src="{{ str_starts_with($logoMarca, 'http') ? $logoMarca : url($logoMarca) }}" alt="{{ config('marca.nombre') }}" height="32" style="display:block;height:32px;">
+            @else
+              <strong style="font-size:18px;">{{ config('marca.nombre') }}</strong>
+            @endif
           </td>
         </tr>
         <tr>
@@ -23,7 +29,7 @@
         </tr>
         <tr>
           <td style="padding:16px 24px;background:#f9fafb;font-size:12px;color:#6b7280;">
-            Informe automático de OliMedia · {{ parse_url(config('app.url'), PHP_URL_HOST) }}
+            Informe automático de {{ config('marca.nombre') }} ·{{ parse_url(config('app.url'), PHP_URL_HOST) }}
           </td>
         </tr>
       </table>

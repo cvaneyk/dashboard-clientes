@@ -80,14 +80,14 @@ class EditCuenta extends EditRecord
                 ->url(fn () => route('conexiones.meta.autorizar', ['cuenta' => $this->getRecord()->id]))
                 ->visible($soloMeta),
 
-            // Método B: token de System User de OliMedia, pegado a mano.
+            // Método B: token de System User de la agencia, pegado a mano.
             Action::make('conectarToken')
                 ->label(fn () => ($this->getRecord()->conexionApi?->metodo === 'system_user')
                     ? 'Renovar token de System User'
                     : 'Conectar con token de System User')
                 ->icon('heroicon-o-key')
                 ->modalHeading('Token de System User de Meta')
-                ->modalDescription('Pega el token de System User del Business Manager con permiso ads_read. No caduca: válido para las cuentas que gestiona OliMedia.')
+                ->modalDescription('Pega el token de System User del Business Manager con permiso ads_read. No caduca: válido para las cuentas que gestiona la agencia.')
                 ->modalSubmitActionLabel('Guardar token')
                 ->schema([
                     TextInput::make('token')
@@ -120,12 +120,12 @@ class EditCuenta extends EditRecord
                 ->url(fn () => route('conexiones.google.autorizar', ['cuenta' => $this->getRecord()->id]))
                 ->visible($soloGoogle),
 
-            // Google · método B: refresh token de la MCC de OliMedia. Uno solo
+            // Google · método B: refresh token de la MCC de la agencia. Uno solo
             // vale para todas las cuentas que cuelgan de ella.
             Action::make('conectarGoogleMcc')
                 ->label(fn () => ($this->getRecord()->conexionApi?->metodo === 'mcc')
                     ? 'Renovar refresh token de la MCC'
-                    : 'Conectar con la MCC de OliMedia')
+                    : 'Conectar con la MCC de la agencia')
                 ->icon('heroicon-o-key')
                 ->modalHeading('Refresh token de Google Ads')
                 ->modalDescription('Para los canales que cuelgan de vuestra cuenta de administrador (MCC). El mismo refresh token sirve para todos esos clientes: lo que cambia es el customer ID de cada Canal.')
@@ -323,7 +323,7 @@ class EditCuenta extends EditRecord
             return [
                 Placeholder::make('ayuda')->content(
                     match ($this->getRecord()->plataforma) {
-                        'google' => 'Conecta esta cuenta con la MCC de OliMedia (un refresh token vale para todos los '
+                        'google' => 'Conecta esta cuenta con la MCC de la agencia (un refresh token vale para todos los '
                             . 'clientes que cuelgan de ella) o con la cuenta del propio cliente. Después, la '
                             . 'sincronización diaria trae los datos sola.',
                         'linkedin' => 'Pide antes acceso a la cuenta del cliente en LinkedIn Business Manager; luego '
@@ -335,7 +335,7 @@ class EditCuenta extends EditRecord
                         'openai' => 'Pega la clave de API de la cuenta publicitaria de este cliente (Ads Manager de '
                             . 'OpenAI → Settings). Cada clave solo ve su cuenta.',
                         default => 'Conecta esta cuenta con "OAuth del cliente" (cada cliente con su propio acceso a '
-                            . 'la API) o con "token de System User" (cuentas gestionadas por OliMedia). Después, la '
+                            . 'la API) o con "token de System User" (cuentas gestionadas por la agencia). Después, la '
                             . 'sincronización diaria trae los datos sola.',
                     }
                 ),
@@ -347,8 +347,8 @@ class EditCuenta extends EditRecord
                 ->label('Método')
                 ->content(match ($conexion->metodo) {
                     'oauth'       => 'Acceso del propio cliente; el token se renueva solo',
-                    'system_user' => 'Token de System User de OliMedia (no caduca)',
-                    'mcc'         => 'Refresh token de la MCC de OliMedia (no caduca)',
+                    'system_user' => 'Token de System User de la agencia (no caduca)',
+                    'mcc'         => 'Refresh token de la MCC de la agencia (no caduca)',
                     'api_key'     => 'Clave de API de la cuenta publicitaria (no caduca)',
                     default       => (string) $conexion->metodo,
                 }),

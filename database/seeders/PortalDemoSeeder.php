@@ -13,7 +13,7 @@ use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 
 /**
- * Datos piloto: Clínica Universitaria La Salle · Meta · junio 2026.
+ * Datos de demostración: cliente ficticio · Meta · junio 2026.
  * Sirve para ver el dashboard funcionando de punta a punta EN LOCAL.
  *
  * SOLO PARA DESARROLLO. No se llama desde DatabaseSeeder a propósito: el deploy
@@ -23,7 +23,7 @@ use Illuminate\Support\Facades\Hash;
  *
  * Ejecutar:  php artisan db:seed --class=Database\\Seeders\\PortalDemoSeeder
  *
- * Acceso cliente demo:  lasalle@olimedia.es  /  lasalle2026
+ * Acceso cliente demo:  demo@example.com  /  demo2026
  */
 class PortalDemoSeeder extends Seeder
 {
@@ -37,15 +37,15 @@ class PortalDemoSeeder extends Seeder
 
         // --- Cliente + usuario de acceso ---
         $cliente = Cliente::updateOrCreate(
-            ['slug' => 'la-salle'],
-            ['nombre' => 'Clínica Universitaria La Salle', 'color' => '#638E76', 'activo' => true]
+            ['slug' => 'clinica-demo'],
+            ['nombre' => 'Clínica Demo', 'color' => '#638E76', 'activo' => true]
         );
 
         User::updateOrCreate(
-            ['email' => 'lasalle@olimedia.es'],
+            ['email' => 'demo@example.com'],
             [
-                'name'       => 'Clínica La Salle',
-                'password'   => Hash::make('lasalle2026'),
+                'name'       => 'Clínica Demo',
+                'password'   => Hash::make('demo2026'),
                 'cliente_id' => $cliente->id,
                 'es_admin'   => false,
             ]
@@ -53,7 +53,7 @@ class PortalDemoSeeder extends Seeder
 
         // --- Cuenta publicitaria (Meta) ---
         $cuenta = Cuenta::updateOrCreate(
-            ['cliente_id' => $cliente->id, 'plataforma' => 'meta', 'nombre_cuenta' => 'Clínica Universitaria La Salle'],
+            ['cliente_id' => $cliente->id, 'plataforma' => 'meta', 'nombre_cuenta' => 'Clínica Demo'],
             ['activo' => true]
         );
 
@@ -132,6 +132,6 @@ class PortalDemoSeeder extends Seeder
             }
         }
 
-        $this->command?->info('Piloto La Salle cargado. Cliente demo: lasalle@olimedia.es / lasalle2026');
+        $this->command?->info('Datos de demostración cargados. Cliente demo: demo@example.com / demo2026');
     }
 }

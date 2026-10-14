@@ -315,7 +315,7 @@ class GoogleAdsConnectorTest extends TestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('refresh token');
 
-        app(GoogleAdsConnector::class)->guardarTokenOauth($cuenta, 'CODIGO', 'https://clientes.olimedia.es/conexiones/google/callback');
+        app(GoogleAdsConnector::class)->guardarTokenOauth($cuenta, 'CODIGO', 'https://portal.example.com/conexiones/google/callback');
     }
 
     public function test_el_callback_con_state_falsificado_no_conecta(): void
@@ -323,7 +323,7 @@ class GoogleAdsConnectorTest extends TestCase
         $cuenta = $this->cuentaGoogle();
         $admin  = User::create([
             'name'     => 'Admin',
-            'email'    => 'admin@olimedia.es',
+            'email'    => 'admin@example.com',
             'password' => 'secretito',
             'es_admin' => true,
         ]);
@@ -342,7 +342,7 @@ class GoogleAdsConnectorTest extends TestCase
         $this->conexion($cuenta);
         $admin = User::create([
             'name'     => 'Admin',
-            'email'    => 'admin@olimedia.es',
+            'email'    => 'admin@example.com',
             'password' => 'secretito',
             'es_admin' => true,
         ]);

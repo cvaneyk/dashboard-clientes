@@ -4,7 +4,7 @@
 Entra en business.facebook.com/settings.
 En el menú lateral: Usuarios → Usuarios del sistema.
 Pulsa Añadir.
-Ponle un nombre descriptivo, por ejemplo api-olimedia-ads o portal-clientes-bot. Evita espacios y nombres de personas.
+Ponle un nombre descriptivo, por ejemplo api-agencia-ads o portal-clientes-bot. Evita espacios y nombres de personas.
 Elige el rol:
 Empleado: es la opción recomendada si solo va a leer o gestionar las cuentas publicitarias que le asignes. Es más segura.
 Administrador: tiene acceso a todo el Business Manager. Úsalo solo si realmente lo necesitas.

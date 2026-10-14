@@ -214,7 +214,7 @@ class PresupuestoPlataformaTest extends TestCase
 
         $admin = User::create([
             'name'     => 'Admin',
-            'email'    => 'admin@olimedia.es',
+            'email'    => 'admin@example.com',
             'password' => 'secretito',
             'es_admin' => true,
         ]);
@@ -233,7 +233,7 @@ class PresupuestoPlataformaTest extends TestCase
 
         $admin = User::create([
             'name'     => 'Admin',
-            'email'    => 'admin@olimedia.es',
+            'email'    => 'admin@example.com',
             'password' => 'secretito',
             'es_admin' => true,
         ]);

@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Schema;
  * del cliente con criterio.
  *
  * OJO: esto NO es el presupuesto del portal. El que factura al cliente es
- * presupuesto_eventos.objetivo_mes, que lleva margen y lo decide OliMedia.
+ * presupuesto_eventos.objetivo_mes, que lleva margen y lo decide la agencia.
  * Esta cifra es de la misma familia que gasto_real: uso interno, nunca se
  * enseña al cliente ni entra en el motor de precios.
  */

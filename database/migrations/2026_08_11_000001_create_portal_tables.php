@@ -28,7 +28,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('cliente_id')->constrained('clientes')->cascadeOnDelete();
             $table->string('plataforma');            // meta | google | tiktok | linkedin
-            $table->string('nombre_cuenta');         // "Clínica Universitaria La Salle"
+            $table->string('nombre_cuenta');         // "Clínica Demo · Meta"
             $table->string('external_id')->nullable();
             $table->boolean('activo')->default(true);
             $table->timestamps();

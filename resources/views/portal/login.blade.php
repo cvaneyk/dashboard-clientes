@@ -3,7 +3,7 @@
 <head>
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
-	<title>Acceso · OliMedia</title>
+	<title>Acceso · {{ config('marca.nombre') }}</title>
 	<style>
 		:root{--green:#638E76;--green-dark:#4f7361;--ink:#141414;--bg:#f6f4f2;--border:#e7e2de}
 		*{box-sizing:border-box;margin:0;font-family:"Outfit",system-ui,-apple-system,"Segoe UI",sans-serif}
@@ -23,7 +23,7 @@
 </head>
 <body>
 	<div class="card">
-		<div class="brand"><img src="https://olimedia.es/wp-content/themes/olimedia/assets/img/olimedia-logo.png" alt="OliMedia Agencia de Marketing"></div>
+		@include('portal.partials.marca')
 		<p class="sub">Portal de clientes · Campañas</p>
 
 		@if ($errors->any())

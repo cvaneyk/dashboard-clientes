@@ -23,8 +23,8 @@ class DatabaseSeederTest extends TestCase
         $original = Hash::make('la-que-puso-javier');
 
         User::create([
-            'name'     => 'OliMedia Admin',
-            'email'    => 'admin@olimedia.es',
+            'name'     => 'Administrador',
+            'email'    => 'admin@example.com',
             'password' => $original,
             'es_admin' => true,
         ]);
@@ -33,17 +33,17 @@ class DatabaseSeederTest extends TestCase
 
         $this->assertSame(
             $original,
-            User::where('email', 'admin@olimedia.es')->value('password'),
+            User::where('email', 'admin@example.com')->value('password'),
             'El seeder del deploy no puede tocar la contraseña de un admin existente'
         );
-        $this->assertSame(1, User::where('email', 'admin@olimedia.es')->count());
+        $this->assertSame(1, User::where('email', 'admin@example.com')->count());
     }
 
     public function test_crea_el_admin_con_una_contrasena_que_no_esta_en_el_repositorio(): void
     {
         $this->seed(DatabaseSeeder::class);
 
-        $admin = User::where('email', 'admin@olimedia.es')->sole();
+        $admin = User::where('email', 'admin@example.com')->sole();
 
         $this->assertTrue($admin->es_admin);
         $this->assertNull($admin->cliente_id);
@@ -76,6 +76,6 @@ class DatabaseSeederTest extends TestCase
     {
         $this->seed(PortalDemoSeeder::class);
 
-        $this->assertSame(1, Cliente::where('slug', 'la-salle')->count());
+        $this->assertSame(1, Cliente::where('slug', 'clinica-demo')->count());
     }
 }

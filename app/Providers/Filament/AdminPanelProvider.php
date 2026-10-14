@@ -31,6 +31,9 @@ class AdminPanelProvider extends PanelProvider
             ->authGuard('admin')
             ->login()
             ->profile()
+            // Marca de la instalación (config/marca.php); sin logo, Filament pinta el nombre.
+            ->brandName(config('marca.nombre'))
+            ->brandLogo(config('marca.logo'))
             ->colors([
                 'primary' => Color::Amber,
             ])

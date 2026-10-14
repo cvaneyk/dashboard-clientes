@@ -96,7 +96,7 @@ class GoogleAdsConnector implements Conector
     }
 
     /**
-     * Alta con un refresh token pegado a mano: el caso de la MCC de OliMedia,
+     * Alta con un refresh token pegado a mano: el caso de la MCC de la agencia,
      * donde un solo token sirve para todas las cuentas que cuelgan de ella.
      */
     public function guardarRefreshToken(Cuenta $cuenta, string $refreshToken, ?string $loginCustomerId = null): ConexionApi
@@ -208,7 +208,7 @@ class GoogleAdsConnector implements Conector
     /**
      * Anota en cada Línea el presupuesto diario que tiene su campaña en Google,
      * como referencia interna. NUNCA toca presupuesto_eventos (lo que se
-     * factura al cliente lo decide OliMedia).
+     * factura al cliente lo decide la agencia).
      *
      * @return int Líneas actualizadas.
      */

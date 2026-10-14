@@ -78,7 +78,7 @@ class DashboardInternoTest extends TestCase
     {
         return User::create([
             'name'     => 'Account manager',
-            'email'    => 'admin@olimedia.es',
+            'email'    => 'admin@example.com',
             'password' => 'secretito',
             'es_admin' => true,
         ]);

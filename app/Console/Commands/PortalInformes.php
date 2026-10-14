@@ -18,7 +18,7 @@ use Throwable;
  * Ejemplos:
  *   php artisan portal:informes                         → todo lo programado
  *   php artisan portal:informes --solo=admin            → solo el resumen interno
- *   php artisan portal:informes --cliente=mi-universidad --para=yo@olimedia.es
+ *   php artisan portal:informes --cliente=mi-universidad --para=yo@example.com
  *                                                       → prueba, a otra dirección
  *   php artisan portal:informes --fecha=2026-09-29      → la semana anterior a esa fecha
  */

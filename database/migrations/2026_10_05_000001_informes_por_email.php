@@ -47,7 +47,7 @@ return new class extends Migration
                     . '<h3>Por canal</h3>'
                     . '<p>{tabla_canales}</p>'
                     . '<p>Puedes ver el detalle por campaña y día en tu portal: <a href="{enlace_dashboard}">{enlace_dashboard}</a></p>'
-                    . '<p>Un saludo,<br>El equipo de OliMedia</p>',
+                    . '<p>Un saludo.</p>',
                 'created_at' => $ahora,
                 'updated_at' => $ahora,
             ],

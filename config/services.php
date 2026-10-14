@@ -60,7 +60,7 @@ return [
     |   - client_id / client_secret: credenciales OAuth de un proyecto de Google
     |     Cloud con la Google Ads API habilitada. En "URIs de redirección
     |     autorizados" debe estar {APP_URL}/conexiones/google/callback
-    |   - login_customer_id: la MCC de OliMedia (solo dígitos, sin guiones). Se
+    |   - login_customer_id: la MCC de la agencia (solo dígitos, sin guiones). Se
     |     manda en la cabecera login-customer-id al leer una cuenta de cliente a
     |     través de la MCC. Cada Cuenta puede sobrescribirlo.
     |

@@ -132,7 +132,7 @@ class InformesSemanalesTest extends TestCase
     {
         Mail::fake();
 
-        User::create(['name' => 'AM', 'email' => 'am@olimedia.es', 'password' => 'x', 'es_admin' => true]);
+        User::create(['name' => 'AM', 'email' => 'am@example.com', 'password' => 'x', 'es_admin' => true]);
 
         $this->cliente('uni', ['email_informes' => 'a@uni.es, b@uni.es', 'informe_semanal' => true]);
         $this->cliente('desactivado', ['email_informes' => 'c@otro.es', 'informe_semanal' => false]);
@@ -143,7 +143,7 @@ class InformesSemanalesTest extends TestCase
         Mail::assertSent(InformeMail::class, 2);
         Mail::assertSent(InformeMail::class, fn (InformeMail $m) => $m->hasTo('a@uni.es') && $m->hasTo('b@uni.es')
             && ! str_contains($m->cuerpo, 'Gasto real'));
-        Mail::assertSent(InformeMail::class, fn (InformeMail $m) => $m->hasTo('am@olimedia.es')
+        Mail::assertSent(InformeMail::class, fn (InformeMail $m) => $m->hasTo('am@example.com')
             && str_contains($m->cuerpo, 'Gasto real'));
         Mail::assertNotSent(InformeMail::class, fn (InformeMail $m) => $m->hasTo('c@otro.es') || $m->hasTo('d@parado.es'));
 
@@ -167,17 +167,17 @@ class InformesSemanalesTest extends TestCase
         $this->cliente('uni', ['email_informes' => 'a@uni.es', 'informe_semanal' => true]);
 
         $this->artisan('portal:informes', [
-            '--fecha' => self::LUNES, '--cliente' => 'uni', '--para' => 'yo@olimedia.es',
+            '--fecha' => self::LUNES, '--cliente' => 'uni', '--para' => 'yo@example.com',
         ])->assertSuccessful();
 
         Mail::assertSent(InformeMail::class, 1);
-        Mail::assertSent(InformeMail::class, fn (InformeMail $m) => $m->hasTo('yo@olimedia.es') && ! $m->hasTo('a@uni.es'));
+        Mail::assertSent(InformeMail::class, fn (InformeMail $m) => $m->hasTo('yo@example.com') && ! $m->hasTo('a@uni.es'));
         $this->assertNull(Cliente::where('slug', 'uni')->first()->ultimo_informe_en);
     }
 
     public function test_el_panel_muestra_las_plantillas_y_los_campos_del_cliente(): void
     {
-        $admin     = User::create(['name' => 'AM', 'email' => 'am@olimedia.es', 'password' => 'x', 'es_admin' => true]);
+        $admin     = User::create(['name' => 'AM', 'email' => 'am@example.com', 'password' => 'x', 'es_admin' => true]);
         $cliente   = $this->cliente('uni');
         $plantilla = PlantillaEmail::deClave(PlantillaEmail::INFORME_SEMANAL);
 

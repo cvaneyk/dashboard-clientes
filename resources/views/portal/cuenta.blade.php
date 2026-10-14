@@ -3,7 +3,7 @@
 <head>
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
-	<title>Mi cuenta · OliMedia</title>
+	<title>Mi cuenta · {{ config('marca.nombre') }}</title>
 	<style>
 		:root{--green:#638E76;--green-dark:#4f7361;--ink:#141414;--mut:#4b5563;--bg:#f6f4f2;--border:#e7e2de}
 		*{box-sizing:border-box;margin:0;font-family:"Outfit",system-ui,-apple-system,"Segoe UI",sans-serif}

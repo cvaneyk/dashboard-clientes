@@ -254,7 +254,7 @@ class OpenAiAdsConnectorTest extends TestCase
         $cuenta = $this->cuentaOpenai();
         $admin  = User::create([
             'name'     => 'Admin',
-            'email'    => 'admin@olimedia.es',
+            'email'    => 'admin@example.com',
             'password' => 'secretito',
             'es_admin' => true,
         ]);

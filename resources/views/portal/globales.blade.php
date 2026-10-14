@@ -3,7 +3,7 @@
 <head>
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
-	<title>Gastos globales · OliMedia</title>
+	<title>Gastos globales · {{ config('marca.nombre') }}</title>
 	<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 	<style>
 		:root{--green:#638E76;--green-dark:#4f7361;--green-soft:#e8efe9;--ink:#141414;--mut:#4b5563;--bg:#f6f4f2;--border:#e7e2de}
@@ -88,7 +88,7 @@
 	<div class="top">
 		<div class="wrap top__row">
 			<div>
-				<div class="brand"><img src="https://olimedia.es/wp-content/themes/olimedia/assets/img/olimedia-logo.png" alt="OliMedia Agencia de Marketing"></div>
+				@include('portal.partials.marca')
 				<div class="client">
 					@if ($visibles->count() > 1)
 						{{ $visibles->count() }} clientes
@@ -207,9 +207,9 @@
 
 	<footer class="foot">
 		<div class="wrap">
-			<div class="brand"><img src="https://olimedia.es/wp-content/uploads/2026/10/OLIMEDIA-Logotipo-principal-tagline-claro.png" alt="OliMedia Agencia de Marketing"></div>
+			@include('portal.partials.marca', ['pie' => true])
 			<div class="foot__disclaimer">* Datos de campaña sin Fee ni IVA</div>
-			<div class="foot__copy">© <span id="year"></span> OliMedia · Agencia de marketing y publicidad. Gastos globales.</div>
+			<div class="foot__copy">© <span id="year"></span> {{ config('marca.nombre') }}{{ config('marca.eslogan') ? ' · '.config('marca.eslogan') : '' }}. Gastos globales.</div>
 		</div>
 	</footer>
 

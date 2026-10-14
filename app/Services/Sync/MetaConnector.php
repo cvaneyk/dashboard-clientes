@@ -20,7 +20,7 @@ use Throwable;
  * intercambiables e idempotentes entre sí.
  *
  * Dos métodos de autenticación, elegidos por cuenta desde /admin:
- *   - 'system_user' → token de System User del Business Manager de OliMedia.
+ *   - 'system_user' → token de System User del Business Manager de la agencia.
  *     No caduca; vale para las cuentas que la agencia gestiona.
  *   - 'oauth' → el cliente conecta su propia cuenta con Facebook Login.
  *     Da un token de vida larga (~60 días) que se renueva aquí solo cuando

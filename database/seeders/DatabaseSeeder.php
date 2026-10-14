@@ -26,26 +26,29 @@ class DatabaseSeeder extends Seeder
 {
     use WithoutModelEvents;
 
-    private const ADMIN_EMAIL = 'admin@olimedia.es';
-
     public function run(): void
     {
-        if (User::where('email', self::ADMIN_EMAIL)->exists()) {
+        // Basta con que haya UN admin, sea cual sea su email: si se comprobara
+        // solo ADMIN_EMAIL, cambiar el email del admin desde el panel haría que
+        // el siguiente deploy creara otro admin nuevo.
+        if (User::where('es_admin', true)->exists()) {
             return;
         }
+
+        $email = config('marca.admin_email');
 
         // Instalación nueva: contraseña aleatoria, que se imprime UNA vez para
         // poder entrar y cambiarla desde el panel. No se guarda en el repositorio.
         $password = Str::password(16);
 
         User::create([
-            'name'     => 'OliMedia Admin',
-            'email'    => self::ADMIN_EMAIL,
+            'name'     => 'Administrador',
+            'email'    => $email,
             'password' => Hash::make($password),
             'es_admin' => true,
         ]);
 
-        $this->command?->warn('Usuario admin creado: ' . self::ADMIN_EMAIL);
+        $this->command?->warn('Usuario admin creado: ' . $email);
         $this->command?->warn('Contraseña temporal: ' . $password);
         $this->command?->warn('Anótala y cámbiala al entrar en /admin. No se volverá a mostrar.');
     }

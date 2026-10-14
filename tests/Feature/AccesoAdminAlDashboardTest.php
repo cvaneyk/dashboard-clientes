@@ -23,7 +23,7 @@ class AccesoAdminAlDashboardTest extends TestCase
     {
         return User::create([
             'name'     => 'Account manager',
-            'email'    => 'admin@olimedia.es',
+            'email'    => 'admin@example.com',
             'password' => 'secretito',
             'es_admin' => true,
         ]);
@@ -33,7 +33,7 @@ class AccesoAdminAlDashboardTest extends TestCase
     {
         $this->admin();
 
-        $this->post('/login', ['email' => 'admin@olimedia.es', 'password' => 'secretito'])
+        $this->post('/login', ['email' => 'admin@example.com', 'password' => 'secretito'])
             ->assertRedirect('/admin');
 
         // Las dos sesiones quedan abiertas: la del portal y la del panel. Sin

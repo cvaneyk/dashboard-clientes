@@ -44,7 +44,7 @@ class PlataformasNuevasTest extends TestCase
     {
         return User::create([
             'name'     => 'Admin',
-            'email'    => 'admin@olimedia.es',
+            'email'    => 'admin@example.com',
             'password' => 'secretito',
             'es_admin' => true,
         ]);

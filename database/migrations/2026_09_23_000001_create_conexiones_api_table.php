@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Schema;
  * Credenciales de API por Cuenta publicitaria (una conexión como máximo por cuenta).
  *
  * metodo = 'system_user' → token de System User pegado por el admin (no caduca,
- *           para cuentas que gestiona OliMedia con su Business Manager).
+ *           para cuentas que gestiona la agencia con su Business Manager).
  * metodo = 'oauth'       → el cliente conecta su propia cuenta vía Facebook Login;
  *           access_token de vida larga (~60 días) que el conector renova solo.
  *

@@ -357,7 +357,7 @@ class LinkedInConnectorTest extends TestCase
     {
         $url = app(LinkedInConnector::class)->urlAutorizacion(
             'nonce',
-            'https://clientes.olimedia.es/conexiones/linkedin/callback'
+            'https://portal.example.com/conexiones/linkedin/callback'
         );
 
         $this->assertStringContainsString('scope=r_ads%20r_ads_reporting', $url);
@@ -392,7 +392,7 @@ class LinkedInConnectorTest extends TestCase
         $cuenta = $this->cuentaLinkedin();
         $admin  = User::create([
             'name'     => 'Admin',
-            'email'    => 'admin@olimedia.es',
+            'email'    => 'admin@example.com',
             'password' => 'secretito',
             'es_admin' => true,
         ]);
@@ -409,7 +409,7 @@ class LinkedInConnectorTest extends TestCase
         $cuenta = $this->cuentaLinkedin();
         $admin  = User::create([
             'name'     => 'Admin',
-            'email'    => 'admin@olimedia.es',
+            'email'    => 'admin@example.com',
             'password' => 'secretito',
             'es_admin' => true,
         ]);

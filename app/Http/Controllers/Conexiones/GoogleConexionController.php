@@ -17,7 +17,7 @@ use Throwable;
  * sesión dentro del `state`, que hace de nonce anti-CSRF.
  *
  * Se usa cuando la cuenta la gestiona el propio cliente con su email. Para las
- * cuentas que cuelgan de la MCC de OliMedia basta con pegar el refresh token
+ * cuentas que cuelgan de la MCC de la agencia basta con pegar el refresh token
  * una vez desde la ficha de la Cuenta.
  */
 class GoogleConexionController extends Controller

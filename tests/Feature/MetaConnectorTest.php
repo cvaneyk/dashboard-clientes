@@ -82,7 +82,7 @@ class MetaConnectorTest extends TestCase
             };
         });
 
-        $conexion = app(MetaConnector::class)->guardarTokenOauth($cuenta, 'CODIGO', 'https://clientes.olimedia.es/conexiones/meta/callback');
+        $conexion = app(MetaConnector::class)->guardarTokenOauth($cuenta, 'CODIGO', 'https://portal.example.com/conexiones/meta/callback');
 
         $this->assertSame('oauth', $conexion->metodo);
         $this->assertSame('token-largo', $conexion->access_token, 'El token se guarda cifrado y se lee en claro');
@@ -111,7 +111,7 @@ class MetaConnectorTest extends TestCase
         $this->expectExceptionMessage('Permissions error');
 
         // Sin acceso a act_123: el guardado entero debe fallar sin dejar conexión.
-        app(MetaConnector::class)->guardarTokenOauth($cuenta, 'CODIGO', 'https://clientes.olimedia.es/conexiones/meta/callback');
+        app(MetaConnector::class)->guardarTokenOauth($cuenta, 'CODIGO', 'https://portal.example.com/conexiones/meta/callback');
     }
 
     public function test_sincronizar_mapea_los_insights_a_metricas_diarias(): void
@@ -277,7 +277,7 @@ class MetaConnectorTest extends TestCase
         $cuenta = $this->cuentaMeta();
         $admin  = User::create([
             'name'     => 'Admin',
-            'email'    => 'admin@olimedia.es',
+            'email'    => 'admin@example.com',
             'password' => 'secretito',
             'es_admin' => true,
         ]);
@@ -307,7 +307,7 @@ class MetaConnectorTest extends TestCase
         $cuenta = $this->cuentaMeta();
         $admin  = User::create([
             'name'     => 'Admin',
-            'email'    => 'admin@olimedia.es',
+            'email'    => 'admin@example.com',
             'password' => 'secretito',
             'es_admin' => true,
         ]);
@@ -326,7 +326,7 @@ class MetaConnectorTest extends TestCase
         $this->conexion($cuenta);
         $admin = User::create([
             'name'     => 'Admin',
-            'email'    => 'admin@olimedia.es',
+            'email'    => 'admin@example.com',
             'password' => 'secretito',
             'es_admin' => true,
         ]);
