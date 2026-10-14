@@ -108,15 +108,17 @@ class PricingPorcentajeTest extends TestCase
         $this->assertSame(0.0, $this->costes()['2026-04-10'], 'Sin gasto no hay margen que aplicar');
     }
 
-    public function test_los_dias_fuera_del_tramo_no_se_facturan(): void
+    public function test_los_dias_fuera_del_tramo_muestran_el_gasto_real(): void
     {
         $this->gasto('2026-04-05', 100);
+        $this->gasto('2026-04-12', 100);
         $this->gasto('2026-04-20', 100);
         $this->tramo('2026-04-10', '2026-04-15', 50);
 
         $costes = $this->costes();
-        $this->assertSame(0.0, $costes['2026-04-05'], 'Antes del tramo');
-        $this->assertSame(0.0, $costes['2026-04-20'], 'Después del tramo');
+        $this->assertSame(100.0, $costes['2026-04-05'], 'Antes del tramo: sin margen');
+        $this->assertSame(150.0, $costes['2026-04-12'], 'Dentro del tramo: con margen');
+        $this->assertSame(100.0, $costes['2026-04-20'], 'Después del tramo: sin margen');
     }
 
     public function test_un_tramo_sin_fecha_de_fin_sigue_vigente(): void
@@ -127,12 +129,12 @@ class PricingPorcentajeTest extends TestCase
         $this->assertSame(88.0, $this->costes()['2026-04-28']);
     }
 
-    public function test_una_linea_pausada_no_factura_aunque_haya_gasto(): void
+    public function test_con_el_margen_en_pausa_se_muestra_el_gasto_real(): void
     {
         $this->gasto('2026-04-10', 200);
         $this->tramo('2026-04-01', null, 25, 'pausada');
 
-        $this->assertSame(0.0, $this->costes()['2026-04-10']);
+        $this->assertSame(200.0, $this->costes()['2026-04-10']);
     }
 
     /** Corregir el margen se hace añadiendo un tramo encima, no editando el viejo. */
@@ -157,11 +159,11 @@ class PricingPorcentajeTest extends TestCase
         $this->assertSame(150.0, $costes['2026-04-20']);
     }
 
-    public function test_sin_ningun_tramo_el_mes_entero_va_a_cero(): void
+    public function test_sin_ningun_tramo_se_muestra_el_gasto_real(): void
     {
         $this->gasto('2026-04-10', 500);
 
-        $this->assertSame(0.0, $this->costes()['2026-04-10'], 'Sin tramo no hay con qué facturar');
+        $this->assertSame(500.0, $this->costes()['2026-04-10'], 'Sin margen, el precio es el de la plataforma');
     }
 
     public function test_el_periodo_acumula_los_dias_del_rango(): void

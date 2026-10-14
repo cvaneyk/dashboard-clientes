@@ -46,8 +46,8 @@ class PlantillaEmail extends Model
             'facturado'     => 'Total facturado a clientes',
             'margen'        => 'Facturado menos gasto real',
             'tabla_kpis'    => 'Tabla de totales (en su propia línea)',
-            'tabla_cuentas' => 'Tabla por cuenta, con gasto sin facturar (en su propia línea)',
-            'avisos'        => 'Errores de sincronización, gasto sin tramo, clientes sin email',
+            'tabla_cuentas' => 'Tabla por cuenta, con el gasto sin margen aplicado',
+            'avisos'        => 'Errores de sincronización, gasto sin margen, clientes sin email',
         ],
     ];
 

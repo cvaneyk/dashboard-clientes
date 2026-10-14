@@ -93,9 +93,8 @@ Por orden aproximado de prioridad:
 7. **APIs de cada plataforma** para sustituir la subida manual.
 8. **Backups de la base de datos.**
 
-Trampa conocida a documentar para el usuario final: una línea sin presupuesto del mes enseña
-inversión, CPC y CPL a 0. Los clics, leads e impresiones reales sí se ven. La solución no es
-tocar código, es rellenar el presupuesto en la ficha de la Línea.
+A tener en cuenta: una línea sin tramo de margen enseña al cliente su gasto real tal cual (lo que
+cuesta en la plataforma). Para cobrar margen hay que asignarle un tramo en `/admin → Líneas`.
 
 ---
 

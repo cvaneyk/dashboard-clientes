@@ -15,23 +15,25 @@ use Illuminate\Support\Collection;
  *
  * REGLA DE NEGOCIO
  * ----------------
- * Al cliente se le factura el gasto real de la plataforma más un porcentaje:
+ * Al cliente se le muestra el gasto real de la plataforma (el que trae la API o
+ * el Excel), más el margen si hay uno aplicado ese día:
  *
- *     coste_cliente_dia = gasto_real_dia * (1 + porcentaje/100)
+ *     coste_cliente_dia = gasto_real_dia * (1 + porcentaje/100)   con margen
+ *     coste_cliente_dia = gasto_real_dia                           sin margen
  *
  * El porcentaje vive en tramos con fecha de inicio y fin (presupuesto_eventos).
  * De ahí salen los casos que hay que soportar:
  *   - Cambiar el margen a mitad de mes: se abre un tramo nuevo.
- *   - Pausar una línea: tramo en estado 'pausada' → 0 €/día.
- *   - Día fuera de todo tramo → 0 €: no hay con qué facturarlo.
- *   - Día sin gasto en la plataforma → 0 €: no hay nada que marginar.
+ *   - Pausar el margen: tramo en estado 'pausada' → gasto real, sin margen.
+ *   - Día fuera de todo tramo → gasto real, sin margen.
+ *   - Día sin gasto en la plataforma → 0 €.
  *
  * OJO: el coste del cliente sigue al gasto real día a día, así que ya NO hay
  * objetivo mensual ni prorrateo. Cambiar el porcentaje de un tramo recalcula
  * todo el periodo que cubre, porque el coste no se persiste.
  *
- * El gasto real por sí solo sigue siendo interno: lo que se enseña al cliente
- * es siempre el resultado de esta multiplicación, nunca la base.
+ * Con margen, el gasto real no debe deducirse de lo que ve el cliente: por eso
+ * sigue sin enviarse a sus vistas y solo se lee como dato interno.
  */
 class PricingEngine
 {
@@ -57,15 +59,12 @@ class PricingEngine
             // Qué tramo manda si varios cubren el día: ver PresupuestoEvento::vigenteEn().
             $tramo = PresupuestoEvento::vigenteEn($tramos, $dia);
 
-            // Día fuera de todo tramo, o línea pausada: no se factura.
-            if (! $tramo || $tramo->estado === 'pausada') {
-                $out->put($clave, 0.0);
-                continue;
-            }
+            // Sin margen aplicado (día fuera de todo tramo, o margen en pausa) se
+            // muestra el gasto real tal cual; con margen, el gasto más el margen.
+            // Si ese día no hubo gasto, no hay nada que mostrar.
+            $multiplicador = ($tramo && $tramo->estado !== 'pausada') ? $tramo->multiplicador() : 1.0;
 
-            // Se factura lo que se pagó de verdad a la plataforma más el margen.
-            // Si ese día no hubo gasto, no hay nada que facturar.
-            $out->put($clave, round(($gastos[$clave] ?? 0.0) * $tramo->multiplicador(), 2));
+            $out->put($clave, round(($gastos[$clave] ?? 0.0) * $multiplicador, 2));
         }
 
         return $this->aplicarOverrides($linea, $out);

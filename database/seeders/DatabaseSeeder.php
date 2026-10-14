@@ -39,7 +39,9 @@ class DatabaseSeeder extends Seeder
 
         // Instalación nueva: contraseña aleatoria, que se imprime UNA vez para
         // poder entrar y cambiarla desde el panel. No se guarda en el repositorio.
-        $password = Str::password(16);
+        // Sin símbolos: el visor de logs web (Coolify) interpreta "<" como HTML
+        // y corta la línea, y la contraseña quedaba a medias.
+        $password = Str::password(20, symbols: false);
 
         User::create([
             'name'     => 'Administrador',

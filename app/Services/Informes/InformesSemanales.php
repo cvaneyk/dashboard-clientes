@@ -108,11 +108,11 @@ class InformesSemanales
             ->keyBy('linea_id');
 
         $filas    = [];
-        $sinTramo = [];
+        $sinMargen = [];
         $total    = ['gasto' => 0.0, 'facturado' => 0.0, 'clics' => 0, 'leads' => 0.0];
 
         foreach ($cuentas as $cuenta) {
-            $fila = ['gasto' => 0.0, 'facturado' => 0.0, 'clics' => 0, 'leads' => 0.0, 'sin_facturar' => 0.0];
+            $fila = ['gasto' => 0.0, 'facturado' => 0.0, 'clics' => 0, 'leads' => 0.0, 'sin_margen' => 0.0];
 
             foreach ($cuenta->lineas as $linea) {
                 $r = $reales->get($linea->id);
@@ -127,10 +127,11 @@ class InformesSemanales
                 $fila['clics']     += (int) $r->clics;
                 $fila['leads']     += (float) $r->leads;
 
-                // Gasto que no se está facturando: falta tramo o está pausada.
-                if ($gasto > 0 && $facturado == 0) {
-                    $fila['sin_facturar'] += $gasto;
-                    $sinTramo[] = $cuenta->cliente->nombre . ' · ' . ($linea->producto ?: $linea->nombre)
+                // Gasto que se repercute al coste, sin ganar nada: falta tramo,
+                // el margen está en pausa o es del 0 %.
+                if ($gasto > 0 && $facturado <= $gasto + 0.005) {
+                    $fila['sin_margen'] += $gasto;
+                    $sinMargen[] = $cuenta->cliente->nombre . ' · ' . ($linea->producto ?: $linea->nombre)
                         . ' (' . self::euros($gasto) . ' de gasto)';
                 }
             }
@@ -157,8 +158,8 @@ class InformesSemanales
                     . $cuenta->nombre_cuenta . ': ' . $cuenta->conexionApi->ultimo_error;
             }
         }
-        foreach ($sinTramo as $s) {
-            $avisos[] = 'Gasto sin tramo de facturación: ' . $s;
+        foreach ($sinMargen as $s) {
+            $avisos[] = 'Gasto sin margen aplicado: ' . $s;
         }
         foreach (Cliente::where('activo', true)->where('informe_semanal', true)->get() as $c) {
             if (! $c->emailsInforme()) {
@@ -250,12 +251,12 @@ class InformesSemanales
         }
 
         return self::tabla(
-            ['Cliente', 'Cuenta', 'Canal', 'Gasto real', 'Facturado', 'Margen', 'Sin facturar', 'Clics', 'Leads'],
+            ['Cliente', 'Cuenta', 'Canal', 'Gasto real', 'Facturado', 'Margen', 'Sin margen', 'Clics', 'Leads'],
             array_map(fn ($f) => [
                 $f['cliente'], $f['cuenta'], $f['plataforma'],
                 self::euros($f['gasto']), self::euros($f['facturado']),
                 self::euros($f['facturado'] - $f['gasto']),
-                $f['sin_facturar'] > 0 ? self::euros($f['sin_facturar']) : '—',
+                $f['sin_margen'] > 0 ? self::euros($f['sin_margen']) : '—',
                 self::entero($f['clics']), self::numero($f['leads']),
             ], $filas),
         );

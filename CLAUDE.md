@@ -11,10 +11,12 @@ estado, roadmap) y [docs/DESPLIEGUE.md](docs/DESPLIEGUE.md) (flujo de despliegue
 
 ## 1. La regla de negocio que manda sobre todo: el motor de precios
 
-Al cliente se le factura **el gasto real de la plataforma más un porcentaje**:
+Al cliente se le muestra **el gasto real de la plataforma** (el que trae la API o el Excel),
+**más el margen si hay uno aplicado** ese día:
 
 ```
-coste_cliente_dia = gasto_real_dia × (1 + porcentaje/100)
+coste_cliente_dia = gasto_real_dia × (1 + porcentaje/100)   ← con margen aplicado
+coste_cliente_dia = gasto_real_dia                           ← sin margen (sin tramo o en pausa)
 ```
 
 Implementado en [app/Services/PricingEngine.php](app/Services/PricingEngine.php).
@@ -31,7 +33,8 @@ Reglas derivadas, **no romper ninguna**:
 - El margen vive en **tramos** en `presupuesto_eventos` (`desde`, `hasta` nullable = sin fin,
   `porcentaje`, `estado` = `activa|pausada`). La tabla conserva el nombre por historia, pero sus
   filas ya no son eventos puntuales: son intervalos.
-- **Día fuera de todo tramo → 0 €.** No hay margen que aplicar, así que no se factura.
+- **Día fuera de todo tramo, o con el margen en pausa → gasto real tal cual.** Sin margen el
+  cliente ve el mismo precio que cuesta la campaña. (Antes de oct. 2026 esto daba 0 €.)
 - **Si varios tramos cubren un día manda [PresupuestoEvento::vigenteEn()](app/Models/PresupuestoEvento.php)**,
   que es la única definición de la regla (la usan el motor y el panel, para que no discrepen):
   primero **una pausa gana sobre todo** —si no, pausar sería imposible—, y entre los activos gana
@@ -43,8 +46,9 @@ Reglas derivadas, **no romper ninguna**:
 - Lo normal es asignar tramos **en bloque** desde `/admin → Líneas` (filtros por cliente, cuenta y
   plataforma + acción masiva "Asignar tramo de facturación"). El repetidor de la ficha de cada
   línea queda plegado, para consultar y para casos sueltos.
-- `gasto_real` (lo que se paga a la plataforma) es **solo uso interno / margen**.
-  **Nunca debe aparecer en ninguna vista del cliente.**
+- `gasto_real` (lo que se paga a la plataforma) es **solo uso interno / margen**: la columna
+  nunca viaja a las vistas del cliente, que reciben solo el coste-cliente ya calculado. Sin margen
+  ese coste coincide con el gasto, y es lo buscado; con margen, el gasto no debe poder deducirse.
 - `lineas.presupuesto_plataforma` (el tope de gasto de la campaña en Meta, que trae la API) es de
   esa misma familia: **referencia interna para el account manager, solo visible en `/admin`**.
   No es el objetivo facturable y **no puede convertirse en uno automáticamente**: el objetivo lo
@@ -417,10 +421,10 @@ con logos SVG inline, tabla de campañas con borde de color por canal, export CS
 - El logo del cliente se sirve por ruta propia `/media/logo/{cliente}` (`route('cliente.logo')`),
   **para no depender de `storage:link`**. Si añades otras imágenes subidas, sigue este patrón o
   asegúrate primero del symlink.
-- **Una línea sin presupuesto del mes muestra inversión/CPC/CPL a 0.** Clics, leads e impresiones
-  reales sí se ven. No es un bug: falta el evento de presupuesto en la ficha de la Línea. Como la
-  sincronización crea líneas solas, en `/admin → Líneas` hay columna "Objetivo cliente", filtro
-  "Solo las que no tienen tramo vigente" y acción masiva "Asignar tramo de facturación".
+- **Una línea sin tramo vigente muestra su gasto real, sin margen.** Como la sincronización crea
+  líneas solas, en `/admin → Líneas` hay columna "Margen aplicado" ("Sin margen" en gris), filtro
+  "Solo las que no tienen tramo vigente" y acción masiva "Asignar tramo de facturación". El resumen
+  semanal interno avisa del "gasto sin margen aplicado".
 
 ---
 

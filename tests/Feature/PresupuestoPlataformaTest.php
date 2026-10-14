@@ -222,7 +222,7 @@ class PresupuestoPlataformaTest extends TestCase
         $this->actingAs($admin, 'admin')
             ->get('/admin/lineas')
             ->assertSuccessful()
-            ->assertSee('Sin tramo');
+            ->assertSee('Sin margen');
     }
 
     public function test_la_accion_masiva_asigna_el_objetivo_a_varias_lineas(): void

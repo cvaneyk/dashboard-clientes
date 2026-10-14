@@ -122,7 +122,7 @@
 			<div class="wrap">
 				<strong>Datos internos · no compartir con el cliente.</strong>
 				Gasto real pagado a la plataforma, lo facturado al cliente y el margen entre ambos.
-				Un margen negativo suele ser gasto sin tramo de facturación.
+				Un margen a 0 es gasto sin margen aplicado (sin tramo o con el margen en pausa).
 				<a href="{{ route('portal.globales') }}">Ver la vista del cliente →</a>
 			</div>
 		</div>

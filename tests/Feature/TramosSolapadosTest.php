@@ -121,7 +121,7 @@ class TramosSolapadosTest extends TestCase
 
         $costes = app(PricingEngine::class)->costeClienteMes($this->linea->fresh(), 2026, 9)->all();
 
-        $this->assertSame(0.0, $costes['2026-09-10'], 'La pausa gana');
+        $this->assertSame(100.0, $costes['2026-09-10'], 'La pausa gana: gasto real, sin el 40 %');
         $this->assertSame(0.0, $costes['2026-09-05'], 'Antes de la pausa no hay gasto, así que 0');
     }
 

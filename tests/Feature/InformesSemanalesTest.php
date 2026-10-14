@@ -115,7 +115,7 @@ class InformesSemanalesTest extends TestCase
         $this->assertStringContainsString('&lt;script&gt;', $informe['cuerpo']);
     }
 
-    public function test_el_resumen_interno_lleva_gasto_margen_y_avisa_del_gasto_sin_tramo(): void
+    public function test_el_resumen_interno_lleva_gasto_margen_y_avisa_del_gasto_sin_margen(): void
     {
         $this->cliente('uni');
         $this->cliente('sin-tramo', conTramo: false, gasto: 50);
@@ -123,9 +123,10 @@ class InformesSemanalesTest extends TestCase
         $informe = app(InformesSemanales::class)->paraAdmin(...$this->semana());
 
         $this->assertStringContainsString('150,00 €', $informe['cuerpo']); // gasto real total
-        $this->assertStringContainsString('120,00 €', $informe['cuerpo']); // facturado
-        $this->assertStringContainsString('-30,00 €', $informe['cuerpo']); // margen: 120 - 150
-        $this->assertStringContainsString('Gasto sin tramo de facturación: Cliente sin-tramo', $informe['cuerpo']);
+        $this->assertStringContainsString('170,00 €', $informe['cuerpo']); // facturado: 100 + 20 % y 50 al coste
+        $this->assertStringContainsString('20,00 €', $informe['cuerpo']);  // margen: 170 - 150
+        $this->assertStringContainsString('Gasto sin margen aplicado: Cliente sin-tramo', $informe['cuerpo']);
+        $this->assertStringNotContainsString('Gasto sin margen aplicado: Cliente uni', $informe['cuerpo']);
     }
 
     public function test_el_comando_envia_a_los_clientes_activados_y_al_admin(): void

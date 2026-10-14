@@ -53,15 +53,15 @@ class LineasTable
                     ->badge()
                     ->toggleable(),
 
-                // Margen que se aplica hoy. Sin tramo vigente, esa campaña sale
-                // a 0 € en el dashboard del cliente: no hay con qué facturarla.
+                // Margen que se aplica hoy. Sin tramo vigente (o en pausa), el
+                // cliente ve el gasto real de esa campaña, sin margen.
                 TextColumn::make('objetivo')
                     ->label('Margen aplicado')
                     ->state(function (Linea $record): string {
                         $tramo = $record->eventoVigente();
 
                         if (! $tramo) {
-                            return 'Sin tramo';
+                            return 'Sin margen';
                         }
 
                         if ($tramo->estado === 'pausada') {
@@ -72,7 +72,7 @@ class LineasTable
                     })
                     ->badge()
                     ->color(fn (string $state) => match ($state) {
-                        'Sin tramo' => 'danger',
+                        'Sin margen' => 'gray',
                         'Pausada'   => 'warning',
                         default     => 'success',
                     }),
