@@ -28,6 +28,9 @@ use Throwable;
  *  - El informe agregado devuelve las métricas como lista de pares
  *    {field_type, field_value}, no como columnas.
  *  - Con granularidad DAY el rango no puede pasar de 90 días: se trocea.
+ *  - Con DAY el informe exige además entity_ids + entity_ids_type: no vale
+ *    pedir "todas las campañas de la cuenta". Se listan antes y se piden por
+ *    lotes.
  *  - Los días son días UTC (la API no deja elegir zona horaria).
  *  - El gasto viene como decimal en la moneda de la cuenta; los presupuestos,
  *    en micros (1.000.000 = 1 €).
@@ -42,6 +45,9 @@ class SpotifyConnector implements Conector
 
     /** Máximo de días por petición con granularidad DAY (límite de Spotify). */
     private const DIAS_POR_TRAMO = 90;
+
+    /** Campañas por petición del informe (entity_ids repetidos en la URL). */
+    private const CAMPANAS_POR_INFORME = 50;
 
     /** Campos de conversión que acepta el informe y pueden contar como lead. */
     private const CONVERSIONES = [
@@ -188,8 +194,20 @@ class SpotifyConnector implements Conector
         $tipos = $this->tiposConversion($cuenta);
         $out   = [];
 
-        foreach ($this->tramos($desde, $hasta) as [$ini, $fin]) {
-            foreach ($this->informe($cuenta, $conexion, $ini, $fin, $tipos) as $fila) {
+        $campanas = array_values(array_filter(array_map(
+            fn ($c) => (string) ($c['id'] ?? ''),
+            $this->paginarOffset('/ad_accounts/' . $this->cuentaExternaId($cuenta) . '/campaigns', 'campaigns', $conexion)
+        )));
+
+        $tramos = [];
+        foreach ($this->tramos($desde, $hasta) as $tramo) {
+            foreach (array_chunk($campanas, self::CAMPANAS_POR_INFORME) as $lote) {
+                $tramos[] = [...$tramo, $lote];
+            }
+        }
+
+        foreach ($tramos as [$ini, $fin, $lote]) {
+            foreach ($this->informe($cuenta, $conexion, $ini, $fin, $lote, $tipos) as $fila) {
                 $stats  = $this->stats($fila);
                 $nombre = trim((string) ($fila['entity_name'] ?? ''));
 
@@ -271,20 +289,24 @@ class SpotifyConnector implements Conector
     }
 
     /**
-     * Informe agregado diario por campaña de un tramo de ≤90 días, con todas
-     * sus páginas. La siguiente página se pide SOLO con el continuation_token:
+     * Informe agregado diario de un lote de campañas en un tramo de ≤90 días,
+     * con todas sus páginas. Con DAY Spotify exige los entity_ids: sin ellos
+     * responde "At least one entity_ids value and an entity_ids_type are required". La siguiente página se pide SOLO con el continuation_token:
      * Spotify ignora el resto de parámetros y avisa si se mandan.
      *
+     * @param  array<int,string>  $campanas
      * @param  array<int,string>  $tipos
      * @return array<int,array<string,mixed>>
      */
-    private function informe(Cuenta $cuenta, ConexionApi $conexion, string $desde, string $hasta, array $tipos): array
+    private function informe(Cuenta $cuenta, ConexionApi $conexion, string $desde, string $hasta, array $campanas, array $tipos): array
     {
         $ruta = '/ad_accounts/' . $this->cuentaExternaId($cuenta) . '/aggregate_reports';
 
         $params = [
-            'entity_type'  => 'CAMPAIGN',
-            'granularity'  => 'DAY',
+            'entity_type'     => 'CAMPAIGN',
+            'entity_ids'      => $campanas,
+            'entity_ids_type' => 'CAMPAIGN',
+            'granularity'     => 'DAY',
             // DAY exige medianoche UTC; el final es inclusivo (trae el día entero).
             'report_start' => $desde . 'T00:00:00Z',
             'report_end'   => $hasta . 'T00:00:00Z',

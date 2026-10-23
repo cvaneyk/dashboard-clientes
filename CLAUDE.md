@@ -390,6 +390,8 @@ madrugada.
   **lista de `{field_type, field_value}`**; los parámetros repetidos (`fields=A&fields=B`) se montan a
   mano. Pagina con `continuation_token`, que se manda **solo**.
 - Con `DAY` el rango **no puede pasar de 90 días**: se trocea. Los días son **UTC**.
+- Con `DAY` el informe **exige `entity_ids` + `entity_ids_type`**: no se puede pedir "toda la
+  cuenta". Se listan antes las campañas (`/campaigns`) y se piden por lotes de 50.
 - Gasto en decimal de la moneda; presupuestos en **micros** y **solo en los ad sets** (se suman por
   campaña, nivel `adsets`).
 - Leads por prioridad con `cuentas.tipos_conversion` (por defecto `LEADS,SIGN_UPS`, requieren el

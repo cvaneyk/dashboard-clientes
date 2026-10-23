@@ -96,8 +96,10 @@ class SpotifyConnectorTest extends TestCase
         ];
     }
 
-    private function fakeSpotify(array $filas, array $campanas = [], array $adSets = []): void
+    private function fakeSpotify(array $filas, ?array $campanas = null, array $adSets = []): void
     {
+        $campanas ??= [['id' => '7f4c1cc9-9a1d-4b65-b05c-46e5e33b6705', 'name' => 'PODCAST']];
+
         Http::fake(function ($request) use ($filas, $campanas, $adSets) {
             $url = $request->url();
 
@@ -167,6 +169,8 @@ class SpotifyConnectorTest extends TestCase
                 && ! str_contains($url, 'fields[')
                 && str_contains($url, 'granularity=DAY')
                 && str_contains($url, 'entity_type=CAMPAIGN')
+                && str_contains($url, 'entity_ids=7f4c1cc9-9a1d-4b65-b05c-46e5e33b6705')
+                && str_contains($url, 'entity_ids_type=CAMPAIGN')
                 && str_contains($url, 'report_start=2026-04-01T00:00:00Z')
                 && str_contains($url, 'report_end=2026-04-03T00:00:00Z')
                 && $request->header('Authorization')[0] === 'Bearer access-vigente';
@@ -227,12 +231,46 @@ class SpotifyConnectorTest extends TestCase
         $this->assertStringContainsString('report_start=2026-04-01T00:00:00Z', $informes[1]);
     }
 
+    /** Con DAY Spotify exige entity_ids: se piden las campañas por lotes de 50. */
+    public function test_pide_el_informe_por_lotes_de_campanas(): void
+    {
+        $cuenta = $this->cuentaSpotify();
+        $this->conexion($cuenta);
+        $this->fakeSpotify([], array_map(fn ($i) => ['id' => "c{$i}", 'name' => "C{$i}"], range(1, 51)));
+
+        app(SpotifyConnector::class)->sincronizarRango($cuenta, '2026-04-01', '2026-04-01');
+
+        $informes = collect(Http::recorded())
+            ->map(fn ($par) => urldecode($par[0]->url()))
+            ->filter(fn ($url) => str_contains($url, 'aggregate_reports'))
+            ->values();
+
+        $this->assertCount(2, $informes);
+        $this->assertSame(50, substr_count($informes[0], 'entity_ids='));
+        $this->assertStringContainsString('entity_ids=c51&', $informes[1]);
+    }
+
+    public function test_sin_campanas_no_pide_informe(): void
+    {
+        $cuenta = $this->cuentaSpotify();
+        $this->conexion($cuenta);
+        $this->fakeSpotify([], []);
+
+        $res = app(SpotifyConnector::class)->sincronizarRango($cuenta, '2026-04-01', '2026-04-01');
+
+        $this->assertSame(0, $res['filas']);
+        Http::assertNotSent(fn ($request) => str_contains($request->url(), 'aggregate_reports'));
+    }
+
     public function test_sigue_el_continuation_token_mandandolo_solo(): void
     {
         $cuenta = $this->cuentaSpotify();
         $this->conexion($cuenta);
 
         Http::fake(function ($request) {
+            if (str_contains($request->url(), '/campaigns')) {
+                return Http::response(['paging' => ['total_results' => 1], 'campaigns' => [['id' => 'c1', 'name' => 'A']]]);
+            }
             if (! str_contains($request->url(), 'aggregate_reports')) {
                 return Http::response([]);
             }
