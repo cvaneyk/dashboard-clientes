@@ -78,6 +78,9 @@ class AgenciaForm
                     ->description('Las apps de la agencia con las que se conectan las cuentas de sus clientes. '
                         . 'Se guardan cifradas. En cada plataforma hay que registrar como URL de retorno la que se indica.')
                     ->collapsible()
+                    // Campos largos (secretos, URLs de retorno): la sección ocupa
+                    // todo el ancho desde lg; por debajo, una columna.
+                    ->columnSpan(['default' => 1, 'lg' => 2])
                     ->columns(2)
                     ->components([
                         TextInput::make('credenciales.meta_app_id')
