@@ -334,9 +334,12 @@ Meta que explican por qué el código no es simétrico:
 - **Tokens en dos escalones**: el `refresh_token` no caduca y con él se pide un `access_token` que
   dura una hora. El access se guarda en `conexiones_api.access_token` con su `expires_at` y se
   renueva solo cuando toca. No confundir esa fecha con la vida de la conexión.
-- **Tres credenciales de agencia** en `.env`, comunes a todos los clientes: `developer_token`
-  (aprobado por Google desde la MCC), `client_id`/`client_secret` (proyecto de Google Cloud) y
-  `login_customer_id` (la MCC). Lo único por cliente es su customer ID (`cuentas.external_id`).
+- **Credenciales de agencia**, comunes a todos sus clientes: `client_id`/`client_secret` (proyecto
+  de Google Cloud con acceso Explorer o superior) y `login_customer_id` (la MCC). **No hay
+  developer token**: Google lo retiró el 9/9/2026 y el nivel de acceso va en el proyecto de Cloud.
+  Lo único por cliente es su customer ID (`cuentas.external_id`).
+- La MCC de la agencia solo se manda (cabecera `login-customer-id`) en conexiones `mcc`; en
+  `oauth` solo la propia de la conexión, si la hay: el anunciante no suele pertenecer a la MCC.
 - La cabecera `login-customer-id` y el customer ID van **solo con dígitos**: el conector quita los
   guiones de `123-456-7890`.
 - Importes en **micros** (1.000.000 = 1 €), no en céntimos.

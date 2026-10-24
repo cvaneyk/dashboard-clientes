@@ -23,8 +23,9 @@ use Throwable;
  *  - Autenticación en dos escalones. El refresh_token no caduca; con él se pide
  *    un access_token que dura una hora. Se guarda el access_token con su
  *    expires_at para no pedir uno en cada llamada.
- *  - Hace falta un developer_token de agencia (aprobado por Google) ADEMÁS del
- *    OAuth del usuario.
+ *  - Ya no hay developer_token: Google lo retiró el 9/9/2026 y ahora el nivel
+ *    de acceso (Test, Explorer, Basic…) va en el proyecto de Google Cloud del
+ *    client_id. Basta con el OAuth.
  *  - Con MCC, un único refresh token sirve para todos los clientes: lo que
  *    cambia por cliente es el customer_id (el external_id de la Cuenta) y la
  *    cabecera login-customer-id, que dice desde qué MCC se entra.
@@ -39,12 +40,11 @@ class GoogleAdsConnector implements Conector
     {
     }
 
-    /** ¿Están las tres piezas de agencia en el .env? */
+    /** ¿Tiene la agencia su app de Google Cloud (client ID y secret)? */
     public function appConfigurada(): bool
     {
         return (bool) config('services.google_ads.client_id')
-            && (bool) config('services.google_ads.client_secret')
-            && (bool) config('services.google_ads.developer_token');
+            && (bool) config('services.google_ads.client_secret');
     }
 
     /**
@@ -330,10 +330,17 @@ class GoogleAdsConnector implements Conector
     /** @return array<string,string> */
     private function cabeceras(ConexionApi $conexion): array
     {
-        $cabeceras = ['developer-token' => (string) config('services.google_ads.developer_token')];
+        $cabeceras = [];
 
-        // Solo se manda si se entra a través de una cuenta de administrador.
-        $mcc = $this->soloDigitos($conexion->login_customer_id ?: (string) config('services.google_ads.login_customer_id'));
+        // login-customer-id solo cuando se entra a través de una MCC. La MCC de
+        // la agencia es el valor por defecto únicamente del método `mcc`: en
+        // `oauth` el anunciante autoriza su propia cuenta, normalmente no
+        // pertenece a esa MCC y mandarla daría USER_PERMISSION_DENIED.
+        $mcc = (string) $conexion->login_customer_id;
+        if ($mcc === '' && $conexion->metodo === 'mcc') {
+            $mcc = (string) config('services.google_ads.login_customer_id');
+        }
+        $mcc = $this->soloDigitos($mcc);
 
         if ($mcc !== '') {
             $cabeceras['login-customer-id'] = $mcc;

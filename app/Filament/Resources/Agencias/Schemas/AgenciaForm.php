@@ -89,10 +89,9 @@ class AgenciaForm
                             ->label('Google Ads · Client ID'),
                         self::secreto('credenciales.google_client_secret', 'Google Ads · Client Secret')
                             ->helperText('URL de retorno: ' . route('conexiones.google.callback')),
-                        self::secreto('credenciales.google_developer_token', 'Google Ads · Developer token'),
                         TextInput::make('credenciales.google_login_customer_id')
                             ->label('Google Ads · ID de la MCC')
-                            ->helperText('Solo dígitos o con guiones. Opcional.'),
+                            ->helperText('Solo para conectar por la MCC de la agencia. Con o sin guiones. Opcional.'),
 
                         TextInput::make('credenciales.linkedin_client_id')
                             ->label('LinkedIn · Client ID'),

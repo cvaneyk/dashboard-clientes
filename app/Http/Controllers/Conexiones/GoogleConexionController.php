@@ -36,7 +36,7 @@ class GoogleConexionController extends Controller
             return $this->volver(['cuenta_id' => $cuenta->id], 'error', 'Esa cuenta no es de Google Ads.');
         }
         if (! $connector->appConfigurada()) {
-            return $this->volver(['cuenta_id' => $cuenta->id], 'error', 'Falta configurar Google Ads (client ID, client secret y developer token) de esta agencia en /admin → Mi agencia.');
+            return $this->volver(['cuenta_id' => $cuenta->id], 'error', 'Falta configurar Google Ads (client ID y client secret) de esta agencia en /admin → Mi agencia.');
         }
         if (trim((string) $cuenta->external_id) === '') {
             return $this->volver(['cuenta_id' => $cuenta->id], 'error', 'Antes de conectar, rellena el "ID de cuenta en la plataforma" (el customer ID de 10 cifras).');

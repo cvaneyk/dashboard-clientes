@@ -33,7 +33,6 @@ class GoogleAdsConnectorTest extends TestCase
         config([
             'services.google_ads.client_id'         => 'cliente.apps.googleusercontent.com',
             'services.google_ads.client_secret'     => 'secreto',
-            'services.google_ads.developer_token'   => 'DEV-TOKEN',
             'services.google_ads.login_customer_id' => '999-888-7777',
             'services.google_ads.api_version'       => 'v25',
         ]);
@@ -127,7 +126,7 @@ class GoogleAdsConnectorTest extends TestCase
         $this->assertStringContainsString('Google Ads API', $log->fichero);
     }
 
-    public function test_manda_developer_token_y_login_customer_id_sin_guiones(): void
+    public function test_manda_login_customer_id_sin_guiones_y_ya_no_el_developer_token(): void
     {
         $cuenta = $this->cuentaGoogle('123-456-7890');
         $this->conexion($cuenta);
@@ -140,10 +139,22 @@ class GoogleAdsConnectorTest extends TestCase
                 return true;
             }
 
-            return $request->header('developer-token')[0] === 'DEV-TOKEN'
+            return ! $request->hasHeader('developer-token')
                 && $request->header('login-customer-id')[0] === '9998887777'
                 && str_contains($request->url(), '/customers/1234567890/googleAds:search');
         });
+    }
+
+    public function test_oauth_del_cliente_no_hereda_la_mcc_de_la_agencia(): void
+    {
+        $cuenta = $this->cuentaGoogle();
+        $this->conexion($cuenta, ['metodo' => 'oauth']);
+        $this->fakeGoogle([]);
+
+        app(GoogleAdsConnector::class)->sincronizar($cuenta);
+
+        Http::assertSent(fn ($request) => ! str_contains($request->url(), 'googleads.googleapis.com')
+            || ! $request->hasHeader('login-customer-id'));
     }
 
     public function test_la_cuenta_puede_tener_su_propia_mcc(): void

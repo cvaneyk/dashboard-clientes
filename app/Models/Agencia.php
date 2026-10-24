@@ -23,7 +23,6 @@ class Agencia extends Model
     public const CREDENCIALES = [
         'meta_app_id'              => 'services.meta.app_id',
         'meta_app_secret'          => 'services.meta.app_secret',
-        'google_developer_token'   => 'services.google_ads.developer_token',
         'google_client_id'         => 'services.google_ads.client_id',
         'google_client_secret'     => 'services.google_ads.client_secret',
         'google_login_customer_id' => 'services.google_ads.login_customer_id',

@@ -76,9 +76,8 @@ class RedirectUriHttpsTest extends TestCase
     public function test_google_manda_un_redirect_uri_https_tras_el_proxy(): void
     {
         config([
-            'services.google_ads.client_id'       => 'cliente',
-            'services.google_ads.client_secret'   => 'secreto',
-            'services.google_ads.developer_token' => 'DEV',
+            'services.google_ads.client_id'     => 'cliente',
+            'services.google_ads.client_secret' => 'secreto',
         ]);
 
         $cuenta = $this->cuenta('google');
