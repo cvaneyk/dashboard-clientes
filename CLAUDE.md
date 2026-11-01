@@ -507,6 +507,80 @@ son el único HTML inyectado. Para probar: acción "Enviar informe" en la lista 
 prueba" en la plantilla, o `php artisan portal:informes --cliente=slug --para=yo@olimedia.es`.
 Requiere SMTP en `.env` (`MAIL_*`); con `MAIL_MAILER=log` el panel avisa de que no saldrá nada.
 
+### Comentarios y gráficos del informe
+
+Cada bloque de cifras va seguido de un comentario, y hay cuatro gráficos. Tres piezas:
+
+- **[Graficos](app/Services/Informes/Graficos.php)** — barras y embudo dibujados con **tablas
+  anidadas y celdas de color**. Es la única técnica que llega al correo: en un email **no hay
+  JavaScript** (Chart.js, que es lo que usa el dashboard, no sirve) y **Gmail y Outlook eliminan el
+  SVG**. Outlook renderiza con el motor de Word: nada de flex, ni hojas de estilo, ni alturas en
+  divs. Las celdas de la barra llevan `font-size:0;line-height:0` porque el `&nbsp;` que las rellena
+  estiraría la fila. Hay un test que falla si alguien mete `<svg>`, `<canvas>` o `<script>`.
+  `Graficos::COLORES` es un **espejo a mano** del objeto `CH` del dashboard: el email no puede leer
+  ese JavaScript, así que un color nuevo hay que ponerlo en los dos sitios.
+- **[Diagnostico](app/Services/Informes/Diagnostico.php)** — los comentarios automáticos, por
+  reglas sobre la variación contra la semana anterior (umbrales `GRAVE` 25 % y `LEVE` 10 %; un canal
+  es problema si se lleva ≥20 % de la inversión y no da leads). **Describe qué cifra se ha movido y
+  dónde mirar; nunca afirma una causa**, porque el motivo (se cambió la segmentación, el cliente
+  cerró, el formulario está roto) no está en `metricas_diarias`. Si no hay semana anterior lo dice,
+  en vez de inventarse una comparación.
+- **`clientes.comentario_semanal`** — la nota que escribe el account manager, con el contexto y las
+  acciones que ningún cálculo puede deducir. Va sellada con `comentario_semanal_semana` (el lunes al
+  que se refiere, elegido en un desplegable de la ficha) y **el informe solo la usa si coincide con
+  la semana que está informando**: sin eso, una nota escrita una vez saldría en todos los informes
+  siguientes como si fuera nueva. Vacía, el informe se envía igual con solo lo automático.
+
+### Comentarios redactados con IA
+
+Con `INFORME_IA=true` los comentarios los redacta Claude en vez de salir de las frases por reglas.
+**Desactivado por defecto a propósito**: un despliegue no debe empezar a llamar a una API de pago
+sin que nadie lo decida. Config en `services.informes.ia` (`activa`, `clave` = `ANTHROPIC_API_KEY`,
+`modelo`, por defecto `claude-opus-5-5`).
+
+- **[ComentarioIa](app/Services/Informes/ComentarioIa.php)** arma los hechos, el prompt y valida.
+- **[RedactorClaude](app/Services/Informes/RedactorClaude.php)** es lo único que habla con la API.
+  Está detrás de la interfaz **[Redactor](app/Services/Informes/Redactor.php)** para que los tests
+  la sustituyan por `Tests\Fakes\RedactorFalso` y no gasten dinero ni dependan de la red.
+
+**La cadena de respaldo es la regla que no se puede romper**: IA → validación → `Diagnostico`. Si la
+clave falta, la API falla, el modelo declina o el texto no pasa la validación, el informe sale con
+las frases por reglas. El lunes a las 09:00 no hay nadie mirando: el correo tiene que salir siempre.
+
+**Validación de cifras.** Se comprueba que **cada número del texto generado esté en los hechos** que
+se le pasaron (comparando con el formato español normalizado); si aparece uno que no está, se
+descarta el texto entero y se registra en el log. No es paranoia: el email lleva la tabla con la
+cifra de verdad dos centímetros más arriba, así que un CPL inventado se ve. Si en la práctica
+descarta demasiado, el log dice qué número sobró.
+
+Dos cosas más que explican la forma del prompt: el modelo recibe **los hechos ya calculados, nunca
+los datos crudos** —de ahí que el informe del cliente no pueda citar `gasto_real`, con test— y se le
+**prohíbe afirmar causas**, porque el *por qué* no está en `metricas_diarias` y un modelo al que no
+se le prohíbe rellena ese hueco con una causa verosímil. Cada bloque devuelve además su `nivel`
+(`problema|aviso|bien|nota`), que es lo que pinta la banda de color: sin él se perdería el aviso
+visual al activar la IA. La nota del account manager le llega como contexto para que no la
+contradiga, pero en el email sale literal, no reescrita.
+
+> **Con Docker no hay que hacer nada**: la imagen ejecuta `composer install` al construirse. **En
+> Plesk, al desplegar esto la primera vez hay que entrar al VPS y ejecutar `composer install`.** Su
+> deploy solo lanza `migrate`, `db:seed` y `optimize:clear` (docs/DESPLIEGUE.md), así que no
+> instala `anthropic-ai/sdk`. Si se olvida, la clase no existe, se captura el error y los informes
+> salen con las frases por reglas: degrada, no rompe, pero la IA no se activa.
+
+Variables nuevas: `{comentario_kpis}`, `{comentario_canales}`, `{comentario_embudo}`, `{embudo}`,
+`{grafico_canales}`, `{grafico_semanas}`, `{nota}` en el del cliente; `{diagnostico}`,
+`{grafico_clientes}`, `{grafico_semanas}` en el interno.
+
+La migración `2026_10_31_000002` las mete en las plantillas **solo si siguen siendo las que sembró
+la migración de octubre, byte a byte**. Si ya las habías editado se dejan como están, porque un
+despliegue no puede pisar lo que escribió el account manager (sección 8): entonces hay que añadir
+los bloques a mano desde `/admin → Plantillas de email`, donde están listados.
+
+Las series por semana (`serieSemanal`, `serieGasto`) piden el coste **una vez por línea y mes de
+toda la ventana**, no una por semana: `costeClienteMes()` consulta la base de datos en cada llamada.
+`serieGasto` se limita a las líneas que cubre el informe, o la barra de la última semana no cuadraría
+con el total de la tabla.
+
 ---
 
 ## 8. Flujo de trabajo

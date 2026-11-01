@@ -11,9 +11,11 @@ use App\Models\PlantillaEmail;
 use App\Models\PresupuestoEvento;
 use App\Models\User;
 use App\Services\Informes\InformesSemanales;
+use App\Services\Informes\Redactor;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
+use Tests\Fakes\RedactorFalso;
 use Tests\TestCase;
 
 /**
@@ -174,6 +176,315 @@ class InformesSemanalesTest extends TestCase
         Mail::assertSent(InformeMail::class, 1);
         Mail::assertSent(InformeMail::class, fn (InformeMail $m) => $m->hasTo('yo@example.com') && ! $m->hasTo('a@uni.es'));
         $this->assertNull(Cliente::where('slug', 'uni')->first()->ultimo_informe_en);
+    }
+
+    /** Añade una métrica más a la primera línea del cliente. */
+    private function metrica(Cliente $cliente, string $fecha, float $gasto, int $clics, float $leads): void
+    {
+        $linea = $cliente->lineas()->firstOrFail();
+
+        MetricaDiaria::create([
+            'cliente_id'  => $cliente->id,
+            'cuenta_id'   => $linea->cuenta_id,
+            'linea_id'    => $linea->id,
+            'plataforma'  => $linea->plataforma,
+            'match_key'   => $linea->match_key,
+            'fecha'       => $fecha,
+            'impresiones' => 1000,
+            'clics'       => $clics,
+            'leads'       => $leads,
+            'gasto_real'  => $gasto,
+        ]);
+    }
+
+    /** Un segundo canal para el cliente, con gasto y sin ningún lead. */
+    private function canalSinLeads(Cliente $cliente, string $plataforma, float $gasto): void
+    {
+        $cuenta = Cuenta::create([
+            'cliente_id'    => $cliente->id,
+            'plataforma'    => $plataforma,
+            'nombre_cuenta' => 'Cuenta ' . $plataforma,
+            'activo'        => true,
+        ]);
+
+        $nombre = 'CAMPANA ' . strtoupper($plataforma);
+
+        $linea = Linea::create([
+            'cliente_id' => $cliente->id,
+            'cuenta_id'  => $cuenta->id,
+            'plataforma' => $plataforma,
+            'nombre'     => $nombre,
+            'match_key'  => Linea::normalizar($nombre),
+            'nivel'      => 'campania',
+            'activo'     => true,
+        ]);
+
+        PresupuestoEvento::create([
+            'linea_id'   => $linea->id,
+            'desde'      => '2026-09-01',
+            'hasta'      => null,
+            'porcentaje' => 20,
+            'estado'     => 'activa',
+        ]);
+
+        MetricaDiaria::create([
+            'cliente_id'  => $cliente->id,
+            'cuenta_id'   => $cuenta->id,
+            'linea_id'    => $linea->id,
+            'plataforma'  => $plataforma,
+            'match_key'   => $linea->match_key,
+            'fecha'       => '2026-09-30',
+            'impresiones' => 5000,
+            'clics'       => 100,
+            'leads'       => 0,
+            'gasto_real'  => $gasto,
+        ]);
+    }
+
+    /**
+     * El invariante que no se puede romper: los comentarios y los gráficos
+     * nuevos manejan las mismas cifras, así que hay que volver a comprobar que
+     * ni el gasto real ni el margen se cuelan en el email del cliente.
+     */
+    public function test_los_comentarios_y_graficos_del_cliente_no_filtran_el_gasto_real(): void
+    {
+        $cliente = $this->cliente('uni');
+        $this->canalSinLeads($cliente, 'google', 400);
+
+        $informe = app(InformesSemanales::class)->paraCliente($cliente, ...$this->semana());
+
+        // Gasto real: 100 + 400 = 500. Facturado: 120 + 480 = 600.
+        $this->assertStringContainsString('600,00 €', $informe['cuerpo']);
+        $this->assertStringNotContainsString('500,00', $informe['cuerpo']);
+        $this->assertStringNotContainsString('400,00', $informe['cuerpo']);
+        $this->assertStringNotContainsString('Gasto real', $informe['cuerpo']);
+        $this->assertStringNotContainsString('argen', $informe['cuerpo']); // Margen / margen
+    }
+
+    /**
+     * Los gráficos van con tablas y colores de fondo a propósito: en un correo
+     * no hay JavaScript, y Gmail y Outlook eliminan el SVG. Si alguien los
+     * reescribe con Chart.js o con un SVG, el informe sale en blanco.
+     */
+    public function test_los_graficos_no_llevan_javascript_ni_svg(): void
+    {
+        $cliente = $this->cliente('uni');
+        $this->canalSinLeads($cliente, 'google', 400);
+
+        $cuerpos = [
+            app(InformesSemanales::class)->paraCliente($cliente, ...$this->semana())['cuerpo'],
+            app(InformesSemanales::class)->paraAdmin(...$this->semana())['cuerpo'],
+        ];
+
+        foreach ($cuerpos as $cuerpo) {
+            $this->assertStringNotContainsString('<script', $cuerpo);
+            $this->assertStringNotContainsString('<svg', $cuerpo);
+            $this->assertStringNotContainsString('<canvas', $cuerpo);
+            $this->assertStringNotContainsString('javascript:', $cuerpo);
+            // Y sí lleva barras: celdas con color de fondo y ancho en porcentaje.
+            $this->assertMatchesRegularExpression('/<td width="\d+%"/', $cuerpo);
+        }
+    }
+
+    public function test_el_comentario_automatico_avisa_de_que_sube_el_coste_por_lead(): void
+    {
+        $cliente = $this->cliente('uni');
+        // La semana informada deja CPL 40 € (120 € / 3 leads). La anterior,
+        // con los mismos 100 € de gasto y 10 leads, lo dejaba en 12 €.
+        $this->metrica($cliente, '2026-09-23', gasto: 100, clics: 50, leads: 10);
+
+        $informe = app(InformesSemanales::class)->paraCliente($cliente, ...$this->semana());
+
+        $this->assertStringContainsString('coste por lead ha subido', $informe['cuerpo']);
+        $this->assertStringContainsString('12,00 €', $informe['cuerpo']);
+        $this->assertStringContainsString('40,00 €', $informe['cuerpo']);
+        $this->assertStringContainsString('menos leads con una inversión parecida', $informe['cuerpo']);
+    }
+
+    public function test_el_comentario_senala_el_canal_que_gasta_sin_dar_leads(): void
+    {
+        $cliente = $this->cliente('uni');
+        $this->canalSinLeads($cliente, 'google', 400);
+
+        $informe = app(InformesSemanales::class)->paraCliente($cliente, ...$this->semana());
+
+        // Google se lleva 480 de 600 € facturados (80 %) y no trae ni un lead.
+        $this->assertStringContainsString('Google Ads se ha llevado el 80 % de la inversión', $informe['cuerpo']);
+        $this->assertStringContainsString('no ha generado ningún lead', $informe['cuerpo']);
+    }
+
+    public function test_sin_semana_anterior_el_comentario_lo_dice_en_vez_de_inventar_una_comparacion(): void
+    {
+        $cliente = $this->cliente('uni');
+
+        $informe = app(InformesSemanales::class)->paraCliente($cliente, ...$this->semana());
+
+        $this->assertStringContainsString('primera semana con datos registrados', $informe['cuerpo']);
+        $this->assertStringNotContainsString('ha subido', $informe['cuerpo']);
+    }
+
+    /**
+     * La nota manual solo vale para la semana a la que se le puso fecha. Sin
+     * esto, una nota escrita una vez saldría en todos los informes siguientes.
+     */
+    public function test_la_nota_manual_sale_solo_en_la_semana_a_la_que_se_refiere(): void
+    {
+        $cliente = $this->cliente('uni', [
+            'comentario_semanal'        => 'El jueves bajamos pujas en Google.',
+            'comentario_semanal_semana' => '2026-09-28',
+        ]);
+
+        $informe = app(InformesSemanales::class)->paraCliente($cliente, ...$this->semana());
+        $this->assertStringContainsString('El jueves bajamos pujas en Google.', $informe['cuerpo']);
+
+        // La misma nota, fechada en otra semana, no aparece.
+        $cliente->update(['comentario_semanal_semana' => '2026-09-21']);
+
+        $informe = app(InformesSemanales::class)->paraCliente($cliente->fresh(), ...$this->semana());
+        $this->assertStringNotContainsString('bajamos pujas', $informe['cuerpo']);
+    }
+
+    public function test_el_diagnostico_interno_avisa_del_gasto_sin_margen(): void
+    {
+        $this->cliente('uni');
+        $this->cliente('sin-tramo', conTramo: false, gasto: 50);
+
+        $informe = app(InformesSemanales::class)->paraAdmin(...$this->semana());
+
+        $this->assertStringContainsString('de gasto que se factura a coste, sin margen', $informe['cuerpo']);
+        $this->assertStringContainsString('Cliente sin-tramo', $informe['cuerpo']);
+        $this->assertStringContainsString('Margen por cliente', $informe['cuerpo']);
+    }
+
+    /** Activa la redacción con IA y pone el redactor falso en su sitio. */
+    private function conIa(?array $respuesta): void
+    {
+        RedactorFalso::reiniciar();
+        RedactorFalso::$respuesta = $respuesta;
+
+        config(['services.informes.ia.activa' => true]);
+        $this->app->bind(Redactor::class, RedactorFalso::class);
+    }
+
+    /**
+     * Una respuesta válida: solo usa cifras que están en los hechos del cliente
+     * 'uni' (120,00 € facturados, 3 leads, CPL 40,00 €, 6 de cada 100 contactan).
+     */
+    private function respuestaValida(): array
+    {
+        return [
+            'kpis'          => 'Has invertido 120,00 € y han entrado 3 leads, a 40,00 € cada uno.',
+            'kpis_nivel'    => 'aviso',
+            'canales'       => 'Esta semana todo ha ido por Meta Ads.',
+            'canales_nivel' => 'nota',
+            'embudo'        => 'De cada 100 personas que entran en la web, contactan 6.',
+            'embudo_nivel'  => 'bien',
+        ];
+    }
+
+    public function test_con_ia_activa_el_email_lleva_el_comentario_redactado(): void
+    {
+        $this->conIa($this->respuestaValida());
+        $cliente = $this->cliente('uni');
+
+        $informe = app(InformesSemanales::class)->paraCliente($cliente, ...$this->semana());
+
+        $this->assertStringContainsString('Has invertido 120,00 € y han entrado 3 leads', $informe['cuerpo']);
+        $this->assertStringContainsString('todo ha ido por Meta Ads', $informe['cuerpo']);
+        // Y ya no salen las frases por reglas.
+        $this->assertStringNotContainsString('primera semana con datos registrados', $informe['cuerpo']);
+        // El nivel que devuelve el modelo pinta la banda de color (aviso = ámbar).
+        $this->assertStringContainsString('#b45309', $informe['cuerpo']);
+    }
+
+    /**
+     * La red que de verdad importa: un número que no está en los datos no puede
+     * llegar al cliente, porque el email lleva la tabla con el número de verdad
+     * dos centímetros más arriba.
+     */
+    public function test_una_cifra_inventada_descarta_el_texto_y_caen_las_frases_por_reglas(): void
+    {
+        $this->conIa([
+            'kpis'          => 'El coste por lead ha sido de 999,00 €.',
+            'kpis_nivel'    => 'problema',
+            'canales'       => 'Todo por Meta Ads.',
+            'canales_nivel' => 'nota',
+            'embudo'        => 'Contactan 6 de cada 100.',
+            'embudo_nivel'  => 'nota',
+        ]);
+        $cliente = $this->cliente('uni');
+
+        $informe = app(InformesSemanales::class)->paraCliente($cliente, ...$this->semana());
+
+        $this->assertStringNotContainsString('999', $informe['cuerpo']);
+        $this->assertStringContainsString('primera semana con datos registrados', $informe['cuerpo']);
+    }
+
+    public function test_si_la_api_falla_el_informe_sale_con_las_frases_por_reglas(): void
+    {
+        $this->conIa(null); // null = la llamada no se pudo completar
+        $cliente = $this->cliente('uni');
+
+        $informe = app(InformesSemanales::class)->paraCliente($cliente, ...$this->semana());
+
+        $this->assertSame(1, RedactorFalso::$llamadas);
+        $this->assertStringContainsString('primera semana con datos registrados', $informe['cuerpo']);
+    }
+
+    /**
+     * El invariante de siempre, ahora en el borde nuevo: lo que se le manda al
+     * modelo para que redacte el informe del cliente no puede llevar el gasto
+     * real, o acabaría citado en el email.
+     */
+    public function test_al_modelo_no_se_le_manda_el_gasto_real_del_cliente(): void
+    {
+        $this->conIa($this->respuestaValida());
+        $cliente = $this->cliente('uni');
+        $this->canalSinLeads($cliente, 'google', 400);
+
+        app(InformesSemanales::class)->paraCliente($cliente, ...$this->semana());
+
+        $peticion = RedactorFalso::$peticion;
+
+        // Facturado: 120 + 480 = 600. Gasto real: 100 + 400 = 500.
+        $this->assertStringContainsString('600,00 €', $peticion);
+        $this->assertStringNotContainsString('500,00', $peticion);
+        $this->assertStringNotContainsString('400,00', $peticion);
+        $this->assertStringNotContainsString('asto real', $peticion); // "gasto real" / "Gasto real"
+    }
+
+    public function test_la_nota_del_equipo_le_llega_al_modelo_como_contexto(): void
+    {
+        $this->conIa($this->respuestaValida());
+
+        $cliente = $this->cliente('uni', [
+            'comentario_semanal'        => 'El jueves bajamos pujas en Google.',
+            'comentario_semanal_semana' => '2026-09-28',
+        ]);
+
+        $informe = app(InformesSemanales::class)->paraCliente($cliente, ...$this->semana());
+
+        // Le llega como contexto, con el aviso de que no la repita...
+        $this->assertStringContainsString('El jueves bajamos pujas en Google.', RedactorFalso::$peticion);
+        $this->assertStringContainsString('NO la repitas', RedactorFalso::$peticion);
+        // ...y además sale tal cual en el email, no reescrita por el modelo.
+        $this->assertStringContainsString('El jueves bajamos pujas en Google.', $informe['cuerpo']);
+    }
+
+    public function test_el_diagnostico_interno_tambien_lo_redacta_la_ia(): void
+    {
+        $this->conIa([
+            'diagnostico'       => 'Hay 50,00 € de gasto sin tramo asignado en Cliente sin-tramo.',
+            'diagnostico_nivel' => 'problema',
+        ]);
+
+        $this->cliente('uni');
+        $this->cliente('sin-tramo', conTramo: false, gasto: 50);
+
+        $informe = app(InformesSemanales::class)->paraAdmin(...$this->semana());
+
+        $this->assertStringContainsString('50,00 € de gasto sin tramo asignado', $informe['cuerpo']);
+        $this->assertStringContainsString('#b91c1c', $informe['cuerpo']); // banda de problema
     }
 
     public function test_el_panel_muestra_las_plantillas_y_los_campos_del_cliente(): void

@@ -163,6 +163,18 @@ return [
     */
     'informes' => [
         'admin' => env('INFORME_ADMIN_EMAIL'),
+
+        /*
+        | Comentarios redactados con IA en vez de con las frases por reglas.
+        | Desactivado por defecto a propósito: un despliegue no debe empezar a
+        | llamar a una API de pago sin que nadie lo haya decidido. Si falla o la
+        | clave falta, el informe sale con los comentarios de Diagnostico.
+        */
+        'ia' => [
+            'activa' => env('INFORME_IA', false),
+            'clave'  => env('ANTHROPIC_API_KEY'),
+            'modelo' => env('INFORME_IA_MODELO', 'claude-opus-5-5'),
+        ],
     ],
 
     'resend' => [
