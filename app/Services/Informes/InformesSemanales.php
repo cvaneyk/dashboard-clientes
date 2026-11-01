@@ -25,7 +25,10 @@ class InformesSemanales
     /** Semanas que entran en el gráfico de evolución (la informada incluida). */
     private const SEMANAS = 6;
 
-    public function __construct(private PricingEngine $engine) {}
+    public function __construct(
+        private PricingEngine $engine,
+        private ComentarioIa $ia,
+    ) {}
 
     /**
      * Semana cerrada anterior a la fecha dada (lunes a domingo, hora de Madrid).
@@ -81,16 +84,28 @@ class InformesSemanales
             'enlace_dashboard' => route('portal.dashboard', ['cliente' => $cliente->slug]),
         ];
 
+        // Los comentarios los redacta la IA si está activada; si no lo está, o
+        // si la llamada falla o el texto no pasa la validación de cifras, se cae
+        // a las frases por reglas de Diagnostico. El informe sale siempre.
+        $notaTexto = self::notaTexto($cliente, $desde);
+        $ia        = $this->ia->paraCliente($cliente, $actual, $anterior, $canales, $desde, $hasta, $notaTexto);
+
         $html = [
             'tabla_kpis'         => $this->tablaKpisCliente($actual, $anterior),
             'tabla_canales'      => $this->tablaCanales($canales),
-            'comentario_kpis'    => Diagnostico::html(Diagnostico::kpis($actual, $anterior)),
-            'comentario_canales' => Diagnostico::html(Diagnostico::canales($canales, $actual)),
-            'comentario_embudo'  => Diagnostico::html(Diagnostico::embudo($actual, $anterior)),
+            'comentario_kpis'    => Diagnostico::html($ia
+                ? [$ia['kpis']]
+                : Diagnostico::kpis($actual, $anterior)),
+            'comentario_canales' => Diagnostico::html($ia
+                ? [$ia['canales']]
+                : Diagnostico::canales($canales, $actual)),
+            'comentario_embudo'  => Diagnostico::html($ia
+                ? [$ia['embudo']]
+                : Diagnostico::embudo($actual, $anterior)),
             'grafico_canales'    => $this->graficoCanales($canales),
             'grafico_semanas'    => $this->graficoSemanas($this->serieSemanal($lineas, $hasta, self::SEMANAS)),
             'embudo'             => $this->embudo($actual),
-            'nota'               => self::nota($cliente, $desde),
+            'nota'               => self::nota($notaTexto),
         ];
 
         // Los textos de la agencia del cliente (o los por defecto).
@@ -197,6 +212,9 @@ class InformesSemanales
         }
         $porCliente = array_values($porCliente);
 
+        // Igual que en el informe del cliente: la IA primero, las reglas si no.
+        $iaAdmin = $this->ia->paraAdmin($total, $porCliente, $desde, $hasta);
+
         $texto = [
             'periodo'   => self::periodo($desde, $hasta),
             'desde'     => $desde->format('d/m/Y'),
@@ -209,7 +227,9 @@ class InformesSemanales
         $html = [
             'tabla_kpis'      => $this->tablaKpisAdmin($total),
             'tabla_cuentas'   => $this->tablaCuentas($filas),
-            'diagnostico'     => Diagnostico::html(Diagnostico::paraAdmin($total, $porCliente)),
+            'diagnostico'     => Diagnostico::html($iaAdmin
+                ? [$iaAdmin]
+                : Diagnostico::paraAdmin($total, $porCliente)),
             'grafico_clientes' => $this->graficoClientes($porCliente),
             'grafico_semanas' => $this->graficoSemanas(
                 $this->serieGasto($hasta, self::SEMANAS, $cuentas->flatMap(fn (Cuenta $c) => $c->lineas->pluck('id'))),
@@ -388,11 +408,21 @@ class InformesSemanales
      * una nota de hace tres semanas saliendo cada lunes como si fuera nueva es
      * peor que no tener nota.
      */
-    private static function nota(Cliente $cliente, Carbon $desde): string
+    private static function notaTexto(Cliente $cliente, Carbon $desde): ?string
     {
         $texto = trim((string) $cliente->comentario_semanal);
 
         if ($texto === '' || $cliente->comentario_semanal_semana?->toDateString() !== $desde->toDateString()) {
+            return null;
+        }
+
+        return $texto;
+    }
+
+    /** La nota ya resuelta, envuelta para el email. */
+    private static function nota(?string $texto): string
+    {
+        if ($texto === null || $texto === '') {
             return '';
         }
 
