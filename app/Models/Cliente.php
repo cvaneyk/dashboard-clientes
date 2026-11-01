@@ -19,8 +19,17 @@ class Cliente extends Model
     }
 
     protected $table = 'clientes';
-    protected $fillable = ['agencia_id', 'nombre', 'slug', 'logo', 'color', 'activo', 'email_informes', 'informe_semanal', 'ultimo_informe_en'];
-    protected $casts = ['activo' => 'boolean', 'informe_semanal' => 'boolean', 'ultimo_informe_en' => 'datetime'];
+    protected $fillable = [
+        'agencia_id', 'nombre', 'slug', 'logo', 'color', 'activo', 'email_informes', 'informe_semanal',
+        'ultimo_informe_en', 'comentario_semanal', 'comentario_semanal_semana',
+    ];
+
+    protected $casts = [
+        'activo'                    => 'boolean',
+        'informe_semanal'           => 'boolean',
+        'ultimo_informe_en'         => 'datetime',
+        'comentario_semanal_semana' => 'date',
+    ];
 
     protected static function booted(): void
     {

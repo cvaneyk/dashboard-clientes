@@ -22,6 +22,9 @@ use Illuminate\Support\Collection;
  */
 class InformesSemanales
 {
+    /** Semanas que entran en el gráfico de evolución (la informada incluida). */
+    private const SEMANAS = 6;
+
     public function __construct(private PricingEngine $engine) {}
 
     /**
@@ -52,8 +55,10 @@ class InformesSemanales
         $anterior = $this->engine->kpis($lineas, $antDesde, $antHasta);
 
         $canales = $lineas->groupBy('plataforma')
-            ->map(fn (Collection $ls, string $plat) => ['canal' => Cuenta::PLATAFORMAS[$plat] ?? $plat]
-                + $this->engine->kpis($ls, $desde, $hasta))
+            ->map(fn (Collection $ls, string $plat) => [
+                'plataforma' => $plat,
+                'canal'      => Cuenta::PLATAFORMAS[$plat] ?? $plat,
+            ] + $this->engine->kpis($ls, $desde, $hasta))
             ->filter(fn ($k) => $k['coste'] > 0 || $k['clics'] > 0 || $k['impresiones'] > 0)
             ->sortByDesc('coste')
             ->values();
@@ -77,8 +82,15 @@ class InformesSemanales
         ];
 
         $html = [
-            'tabla_kpis'    => $this->tablaKpisCliente($actual, $anterior),
-            'tabla_canales' => $this->tablaCanales($canales),
+            'tabla_kpis'         => $this->tablaKpisCliente($actual, $anterior),
+            'tabla_canales'      => $this->tablaCanales($canales),
+            'comentario_kpis'    => Diagnostico::html(Diagnostico::kpis($actual, $anterior)),
+            'comentario_canales' => Diagnostico::html(Diagnostico::canales($canales, $actual)),
+            'comentario_embudo'  => Diagnostico::html(Diagnostico::embudo($actual, $anterior)),
+            'grafico_canales'    => $this->graficoCanales($canales),
+            'grafico_semanas'    => $this->graficoSemanas($this->serieSemanal($lineas, $hasta, self::SEMANAS)),
+            'embudo'             => $this->embudo($actual),
+            'nota'               => self::nota($cliente, $desde),
         ];
 
         // Los textos de la agencia del cliente (o los por defecto).
@@ -172,6 +184,19 @@ class InformesSemanales
             }
         }
 
+        // Las filas van por cuenta; el gráfico y el diagnóstico hablan de
+        // clientes, así que se agrupan aquí en vez de repetir la consulta.
+        $porCliente = [];
+        foreach ($filas as $f) {
+            $porCliente[$f['cliente']] ??= [
+                'cliente' => $f['cliente'], 'gasto' => 0.0, 'facturado' => 0.0, 'sin_margen' => 0.0,
+            ];
+            $porCliente[$f['cliente']]['gasto']        += $f['gasto'];
+            $porCliente[$f['cliente']]['facturado']    += $f['facturado'];
+            $porCliente[$f['cliente']]['sin_margen']   += $f['sin_margen'];
+        }
+        $porCliente = array_values($porCliente);
+
         $texto = [
             'periodo'   => self::periodo($desde, $hasta),
             'desde'     => $desde->format('d/m/Y'),
@@ -182,9 +207,15 @@ class InformesSemanales
         ];
 
         $html = [
-            'tabla_kpis'    => $this->tablaKpisAdmin($total),
-            'tabla_cuentas' => $this->tablaCuentas($filas),
-            'avisos'        => $avisos
+            'tabla_kpis'      => $this->tablaKpisAdmin($total),
+            'tabla_cuentas'   => $this->tablaCuentas($filas),
+            'diagnostico'     => Diagnostico::html(Diagnostico::paraAdmin($total, $porCliente)),
+            'grafico_clientes' => $this->graficoClientes($porCliente),
+            'grafico_semanas' => $this->graficoSemanas(
+                $this->serieGasto($hasta, self::SEMANAS, $cuentas->flatMap(fn (Cuenta $c) => $c->lineas->pluck('id'))),
+                'gasto real',
+            ),
+            'avisos'          => $avisos
                 ? '<ul>' . implode('', array_map(fn ($a) => '<li>' . e($a) . '</li>', $avisos)) . '</ul>'
                 : '<p>Sin avisos esta semana.</p>',
         ];
@@ -213,6 +244,275 @@ class InformesSemanales
             ->filter(fn ($e) => filter_var($e, FILTER_VALIDATE_EMAIL))
             ->values()
             ->all();
+    }
+
+    // ------------------------------------------------------------- gráficos
+
+    /**
+     * Barras de inversión y de leads por canal. El canal que se lleva una parte
+     * apreciable del dinero sin devolver ningún lead se marca en rojo: es lo
+     * que hay que ver sin leer nada.
+     *
+     * @param  Collection<int,array>  $canales
+     */
+    private function graficoCanales(Collection $canales): string
+    {
+        if ($canales->isEmpty()) {
+            return '<p style="font-size:14px;color:#6b7280;">Sin actividad en esta semana.</p>';
+        }
+
+        $total = (float) $canales->sum('coste');
+
+        $inversion = $canales->map(fn ($c) => [
+            'etiqueta' => $c['canal'],
+            'valor'    => $c['coste'],
+            'texto'    => self::euros($c['coste']),
+            'color'    => Graficos::color($c['plataforma'] ?? null),
+            'alerta'   => $c['leads'] == 0 && $total > 0 && $c['coste'] / $total >= 0.2,
+        ])->all();
+
+        $leads = $canales->sortByDesc('leads')->map(fn ($c) => [
+            'etiqueta' => $c['canal'],
+            'valor'    => $c['leads'],
+            'texto'    => self::numero($c['leads']),
+            'color'    => Graficos::color($c['plataforma'] ?? null),
+            'alerta'   => $c['leads'] == 0 && $c['coste'] > 0,
+        ])->values()->all();
+
+        return self::rotulo('Inversión por canal') . Graficos::barras($inversion)
+            . self::rotulo('Leads por canal') . Graficos::barras($leads);
+    }
+
+    /**
+     * Evolución de las últimas semanas. La barra es el importe, porque siempre
+     * hay importe; los leads y el CPL van en el texto. Si la barra fuera el CPL,
+     * una semana sin leads saldría vacía y parecería un fallo del gráfico.
+     *
+     * @param  list<array{etiqueta:string,coste:float,leads:float,cpl:float}>  $serie
+     */
+    private function graficoSemanas(array $serie, string $queMide = 'inversión'): string
+    {
+        if (! $serie) {
+            return '';
+        }
+
+        $ultima = count($serie) - 1;
+        $filas  = [];
+
+        foreach ($serie as $i => $s) {
+            $filas[] = [
+                'etiqueta' => $s['etiqueta'] . ($i === $ultima ? ' (esta)' : ''),
+                'valor'    => $s['coste'],
+                'texto'    => self::euros($s['coste']) . ' · ' . self::numero($s['leads']) . ' leads',
+            ];
+        }
+
+        return self::rotulo('Últimas ' . count($serie) . ' semanas · ' . $queMide)
+            . Graficos::barras($filas, '#638E76');
+    }
+
+    /** Impresiones → clics → leads, con lo que pasa de cada paso al siguiente. */
+    private function embudo(array $a): string
+    {
+        if ($a['impresiones'] == 0 && $a['clics'] == 0) {
+            return '';
+        }
+
+        $ctr    = $a['impresiones'] > 0 ? $a['clics'] / $a['impresiones'] * 100 : 0.0;
+        $aLeads = $a['clics'] > 0 ? $a['leads'] / $a['clics'] * 100 : 0.0;
+
+        return Graficos::embudo([
+            [
+                'nombre' => 'Se mostró el anuncio',
+                'valor'  => self::entero($a['impresiones']),
+                'paso'   => self::numero($ctr) . ' % hace clic',
+            ],
+            [
+                'nombre' => 'Entraron en la web',
+                'valor'  => self::entero($a['clics']),
+                'paso'   => self::numero($aLeads) . ' % contacta',
+            ],
+            [
+                'nombre' => 'Contactaron',
+                'valor'  => self::numero($a['leads']),
+            ],
+        ]);
+    }
+
+    /**
+     * Margen por cliente, solo para el informe interno.
+     *
+     * @param  list<array{cliente:string,gasto:float,facturado:float,sin_margen:float}>  $porCliente
+     */
+    private function graficoClientes(array $porCliente): string
+    {
+        if (! $porCliente) {
+            return '';
+        }
+
+        $filas = [];
+
+        foreach ($porCliente as $f) {
+            $margen = $f['facturado'] - $f['gasto'];
+            $texto  = self::euros($margen);
+
+            if ($f['sin_margen'] > 0) {
+                $texto .= ' · ' . self::euros($f['sin_margen']) . ' de gasto sin margen';
+            }
+
+            $filas[] = [
+                'etiqueta' => $f['cliente'],
+                // Las barras no dibujan negativos: un margen bajo cero se queda
+                // sin barra y en rojo, que es exactamente lo que hay que ver.
+                'valor'    => max(0.0, $margen),
+                'texto'    => $texto,
+                'alerta'   => $margen <= 0 || $f['sin_margen'] > 0,
+            ];
+        }
+
+        usort($filas, fn ($x, $y) => $y['valor'] <=> $x['valor']);
+
+        return self::rotulo('Margen por cliente') . Graficos::barras($filas, '#638E76');
+    }
+
+    private static function rotulo(string $texto): string
+    {
+        return '<p style="margin:14px 0 2px;font-size:12px;font-weight:700;text-transform:uppercase;'
+            . 'letter-spacing:.04em;color:#6b7280;">' . e($texto) . '</p>';
+    }
+
+    /**
+     * La nota que el account manager escribió para ESTA semana.
+     *
+     * Si la fecha guardada no es la del lunes que se está informando, se ignora:
+     * una nota de hace tres semanas saliendo cada lunes como si fuera nueva es
+     * peor que no tener nota.
+     */
+    private static function nota(Cliente $cliente, Carbon $desde): string
+    {
+        $texto = trim((string) $cliente->comentario_semanal);
+
+        if ($texto === '' || $cliente->comentario_semanal_semana?->toDateString() !== $desde->toDateString()) {
+            return '';
+        }
+
+        return '<table cellpadding="0" cellspacing="0" style="border-collapse:collapse;width:100%;margin:8px 0 18px;">'
+            . '<tr><td style="padding:14px 16px;background:#f6f4f2;border-radius:8px;font-size:14px;'
+            . 'line-height:1.6;color:#374151;">' . nl2br(e($texto)) . '</td></tr></table>';
+    }
+
+    // -------------------------------------------------------------- series
+
+    /**
+     * Inversión y leads de las últimas semanas, para el cliente.
+     *
+     * El coste se pide al motor una vez por línea y mes de toda la ventana, no
+     * una vez por semana: `costeClienteMes()` consulta la base de datos en cada
+     * llamada, y pedirlo semana a semana multiplicaba las consultas por seis.
+     *
+     * @param  Collection<int,\App\Models\Linea>  $lineas
+     * @return list<array{etiqueta:string,coste:float,leads:float,cpl:float}>
+     */
+    private function serieSemanal(Collection $lineas, Carbon $hasta, int $semanas): array
+    {
+        if ($lineas->isEmpty()) {
+            return [];
+        }
+
+        $fin = $hasta->copy();
+        $ini = $fin->copy()->startOfWeek(Carbon::MONDAY)->subWeeks($semanas - 1);
+
+        $costePorDia = [];
+        $cursor      = $ini->copy()->startOfMonth();
+
+        while ($cursor->lte($fin)) {
+            foreach ($lineas as $linea) {
+                foreach ($this->engine->costeClienteMes($linea, $cursor->year, $cursor->month) as $f => $c) {
+                    $costePorDia[$f] = ($costePorDia[$f] ?? 0.0) + $c;
+                }
+            }
+            $cursor->addMonth();
+        }
+
+        $leadsPorDia = MetricaDiaria::whereIn('linea_id', $lineas->pluck('id'))
+            ->whereBetween('fecha', [$ini->toDateString(), $fin->toDateString()])
+            ->selectRaw('fecha, SUM(leads) leads')
+            ->groupBy('fecha')
+            ->get()
+            ->mapWithKeys(fn ($r) => [Carbon::parse($r->fecha)->toDateString() => (float) $r->leads])
+            ->all();
+
+        return self::porSemanas($ini, $semanas, $costePorDia, $leadsPorDia);
+    }
+
+    /**
+     * Gasto real y leads por semana, para el informe interno. Una sola consulta:
+     * aquí no hace falta el motor de precios.
+     *
+     * Se le pasan las líneas que cubre el informe (las de clientes activos) y no
+     * se consulta la tabla entera: si no, la barra de esta semana no cuadraría
+     * con el total de la tabla de arriba y parecería que una de las dos miente.
+     *
+     * @param  \Illuminate\Support\Collection<int,int>  $lineaIds
+     * @return list<array{etiqueta:string,coste:float,leads:float,cpl:float}>
+     */
+    private function serieGasto(Carbon $hasta, int $semanas, Collection $lineaIds): array
+    {
+        $fin = $hasta->copy();
+        $ini = $fin->copy()->startOfWeek(Carbon::MONDAY)->subWeeks($semanas - 1);
+
+        if ($lineaIds->isEmpty()) {
+            return [];
+        }
+
+        $gasto = [];
+        $leads = [];
+
+        MetricaDiaria::whereIn('linea_id', $lineaIds)
+            ->whereBetween('fecha', [$ini->toDateString(), $fin->toDateString()])
+            ->selectRaw('fecha, SUM(gasto_real) gasto, SUM(leads) leads')
+            ->groupBy('fecha')
+            ->get()
+            ->each(function ($r) use (&$gasto, &$leads) {
+                $f         = Carbon::parse($r->fecha)->toDateString();
+                $gasto[$f] = (float) $r->gasto;
+                $leads[$f] = (float) $r->leads;
+            });
+
+        return self::porSemanas($ini, $semanas, $gasto, $leads);
+    }
+
+    /**
+     * Reparte dos mapas día => importe en cubos semanales de lunes a domingo.
+     *
+     * @param  array<string,float>  $coste
+     * @param  array<string,float>  $leads
+     * @return list<array{etiqueta:string,coste:float,leads:float,cpl:float}>
+     */
+    private static function porSemanas(Carbon $primerLunes, int $semanas, array $coste, array $leads): array
+    {
+        $out = [];
+
+        for ($s = 0; $s < $semanas; $s++) {
+            $lunes = $primerLunes->copy()->addWeeks($s);
+            $c     = 0.0;
+            $l     = 0.0;
+
+            for ($d = 0; $d < 7; $d++) {
+                $f  = $lunes->copy()->addDays($d)->toDateString();
+                $c += $coste[$f] ?? 0.0;
+                $l += $leads[$f] ?? 0.0;
+            }
+
+            $out[] = [
+                'etiqueta' => $lunes->format('d/m'),
+                'coste'    => round($c, 2),
+                'leads'    => $l,
+                'cpl'      => $l > 0 ? round($c / $l, 2) : 0.0,
+            ];
+        }
+
+        return $out;
     }
 
     // ---------------------------------------------------------------- HTML

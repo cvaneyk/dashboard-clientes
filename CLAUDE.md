@@ -507,6 +507,44 @@ son el único HTML inyectado. Para probar: acción "Enviar informe" en la lista 
 prueba" en la plantilla, o `php artisan portal:informes --cliente=slug --para=yo@olimedia.es`.
 Requiere SMTP en `.env` (`MAIL_*`); con `MAIL_MAILER=log` el panel avisa de que no saldrá nada.
 
+### Comentarios y gráficos del informe
+
+Cada bloque de cifras va seguido de un comentario, y hay cuatro gráficos. Tres piezas:
+
+- **[Graficos](app/Services/Informes/Graficos.php)** — barras y embudo dibujados con **tablas
+  anidadas y celdas de color**. Es la única técnica que llega al correo: en un email **no hay
+  JavaScript** (Chart.js, que es lo que usa el dashboard, no sirve) y **Gmail y Outlook eliminan el
+  SVG**. Outlook renderiza con el motor de Word: nada de flex, ni hojas de estilo, ni alturas en
+  divs. Las celdas de la barra llevan `font-size:0;line-height:0` porque el `&nbsp;` que las rellena
+  estiraría la fila. Hay un test que falla si alguien mete `<svg>`, `<canvas>` o `<script>`.
+  `Graficos::COLORES` es un **espejo a mano** del objeto `CH` del dashboard: el email no puede leer
+  ese JavaScript, así que un color nuevo hay que ponerlo en los dos sitios.
+- **[Diagnostico](app/Services/Informes/Diagnostico.php)** — los comentarios automáticos, por
+  reglas sobre la variación contra la semana anterior (umbrales `GRAVE` 25 % y `LEVE` 10 %; un canal
+  es problema si se lleva ≥20 % de la inversión y no da leads). **Describe qué cifra se ha movido y
+  dónde mirar; nunca afirma una causa**, porque el motivo (se cambió la segmentación, el cliente
+  cerró, el formulario está roto) no está en `metricas_diarias`. Si no hay semana anterior lo dice,
+  en vez de inventarse una comparación.
+- **`clientes.comentario_semanal`** — la nota que escribe el account manager, con el contexto y las
+  acciones que ningún cálculo puede deducir. Va sellada con `comentario_semanal_semana` (el lunes al
+  que se refiere, elegido en un desplegable de la ficha) y **el informe solo la usa si coincide con
+  la semana que está informando**: sin eso, una nota escrita una vez saldría en todos los informes
+  siguientes como si fuera nueva. Vacía, el informe se envía igual con solo lo automático.
+
+Variables nuevas: `{comentario_kpis}`, `{comentario_canales}`, `{comentario_embudo}`, `{embudo}`,
+`{grafico_canales}`, `{grafico_semanas}`, `{nota}` en el del cliente; `{diagnostico}`,
+`{grafico_clientes}`, `{grafico_semanas}` en el interno.
+
+La migración `2026_10_31_000002` las mete en las plantillas **solo si siguen siendo las que sembró
+la migración de octubre, byte a byte**. Si ya las habías editado se dejan como están, porque un
+despliegue no puede pisar lo que escribió el account manager (sección 8): entonces hay que añadir
+los bloques a mano desde `/admin → Plantillas de email`, donde están listados.
+
+Las series por semana (`serieSemanal`, `serieGasto`) piden el coste **una vez por línea y mes de
+toda la ventana**, no una por semana: `costeClienteMes()` consulta la base de datos en cada llamada.
+`serieGasto` se limita a las líneas que cubre el informe, o la barra de la última semana no cuadraría
+con el total de la tabla.
+
 ---
 
 ## 8. Flujo de trabajo
