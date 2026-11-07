@@ -3,7 +3,7 @@
 ## Cadena de trabajo
 
 ```
-edición local  →  commit + push a GitHub (cvaneyk/clientes-portal)  →  Plesk despliega en el VPS
+edición local  →  commit + push a GitHub (cvaneyk/dashboard-clientes)  →  Plesk despliega en el VPS
 ```
 
 El repo de GitHub es la **fuente de verdad**. Nada se edita directamente en el servidor: lo que no
@@ -55,8 +55,10 @@ scheduler de Laravel, pero en el VPS **hay que crear el cron una vez a mano** en
 Plesk → *Scheduled Tasks* (tarea del tipo "Ejecutar un comando PHP" o cron del sistema):
 
 ```bash
-cd /var/www/vhosts/olimedia.es/clientes.olimedia.es && /opt/plesk/php/8.4/bin/php artisan schedule:run
+cd <carpeta-de-la-app-en-el-vps> && /opt/plesk/php/8.4/bin/php artisan schedule:run
 ```
+
+Sustituye `<carpeta-de-la-app-en-el-vps>` por la carpeta del sitio, la que contiene `artisan`.
 
 Cada minuto (`* * * * *`); el propio scheduler decide cuándo toca ejecutar. Sin este cron, la
 sincronización solo va a mano: botón "Sincronizar ahora" en la ficha de la cuenta o
@@ -67,7 +69,7 @@ Variables del `.env` del servidor para la conexión OAuth de Meta:
 
 ## Configuración del servidor
 
-- Docroot del subdominio `clientes.olimedia.es` → carpeta `public/` de Laravel.
+- Docroot del subdominio `dashboard.carlosvaneyk.online` → carpeta `public/` de Laravel.
 - SSL: Let's Encrypt.
 - MySQL en el mismo VPS.
 - El `.env` vive **solo en el servidor** (está en `.gitignore`). Si hace falta una variable nueva,

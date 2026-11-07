@@ -1,7 +1,7 @@
-# CLAUDE.md — clientes-portal
+# CLAUDE.md — dashboard-clientes
 
 Portal de clientes de Paid Media de **OliMedia**. Laravel + Filament, independiente del
-WordPress de olimedia.es, desplegado en `clientes.olimedia.es` (VPS con Plesk).
+WordPress de olimedia.es, desplegado en `dashboard.carlosvaneyk.online` (VPS con Plesk).
 **Estado: MVP en producción** con un cliente piloto ("Mi universidad", Meta + Google + TikTok).
 
 Documentación complementaria: [docs/CONTEXTO-PROYECTO.md](docs/CONTEXTO-PROYECTO.md) (concepto,
@@ -518,7 +518,7 @@ Lógica en [InformesSemanales](app/Services/Informes/InformesSemanales.php). Los
 migración y cada una la usa un informe por su `clave`). Variables entre llaves (`{cliente}`), con
 `strtr`, **no Blade**: el texto viene del panel. Las de texto se escapan; las tablas (`{tabla_*}`)
 son el único HTML inyectado. Para probar: acción "Enviar informe" en la lista de Clientes, "Enviar
-prueba" en la plantilla, o `php artisan portal:informes --cliente=slug --para=yo@olimedia.es`.
+prueba" en la plantilla, o `php artisan portal:informes --cliente=slug --para=yo@example.com`.
 Requiere SMTP en `.env` (`MAIL_*`); con `MAIL_MAILER=log` el panel avisa de que no saldrá nada.
 
 ### Comentarios y gráficos del informe
@@ -599,7 +599,7 @@ con el total de la tabla.
 
 ## 8. Flujo de trabajo
 
-- **El repo GitHub `cvaneyk/clientes-portal` es la fuente de verdad.** Push → Plesk despliega.
+- **El repo GitHub `cvaneyk/dashboard-clientes` es la fuente de verdad.** Push → Plesk despliega.
   Detalle en [docs/DESPLIEGUE.md](docs/DESPLIEGUE.md).
 - No se hacen commits ni push sin que lo pida el usuario.
 - Comentarios y nombres de dominio **en español** (`lineas`, `presupuesto_eventos`,

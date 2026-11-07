@@ -1,4 +1,4 @@
-# clientes-portal — contexto del proyecto
+# dashboard-clientes — contexto del proyecto
 
 Documento de traspaso: qué es el proyecto, por qué está hecho así, en qué punto está y qué queda.
 Para las reglas técnicas del día a día, ver [../CLAUDE.md](../CLAUDE.md).
@@ -24,7 +24,7 @@ Dos roles:
 - **Cliente** (`users.cliente_id = X`): solo el dashboard de su cliente, entrando por `/login`.
 
 La app es **independiente del WordPress de olimedia.es**. Vive en el subdominio
-`clientes.olimedia.es`.
+`dashboard.carlosvaneyk.online`.
 
 ---
 
@@ -100,10 +100,10 @@ cuesta en la plataforma). Para cobrar margen hay que asignarle un tramo en `/adm
 
 ## 6. Entorno y accesos
 
-- Subdominio: `clientes.olimedia.es` · panel admin en `/admin` · clientes en `/login`.
+- Subdominio: `dashboard.carlosvaneyk.online` · panel admin en `/admin` · clientes en `/login`.
 - Usuario admin del panel: `admin@olimedia.es` (la contraseña la custodia Javier; no se guarda
   en el repo).
-- Repo: `github.com/cvaneyk/clientes-portal` — fuente de verdad.
+- Repo: `github.com/cvaneyk/dashboard-clientes` — fuente de verdad.
 - Despliegue: Plesk Git. Ver [DESPLIEGUE.md](DESPLIEGUE.md).
 - Base de datos: MySQL en el mismo VPS. Credenciales solo en el `.env` del servidor, que está en
   `.gitignore`.
