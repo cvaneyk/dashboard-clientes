@@ -487,6 +487,20 @@ cabecera de los dos dashboards; también en el menú de Filament (la interna).
 
 ---
 
+## 7d. Manuales de conexión
+
+`/manuales` y `/manuales/{plataforma}`, solo admins
+([ManualesController](app/Http/Controllers/ManualesController.php) +
+[Manuales](app/Support/Manuales.php)). Se llega desde el menú de Filament, la cabecera del dashboard
+(solo si es admin) y el botón "Manual" de la ficha del canal.
+
+El texto está en [resources/manuales/](resources/manuales/), un Markdown por plataforma de
+`Cuenta::PLATAFORMAS`; una plataforma nueva sin manual hace fallar `ManualesTest`. **Si cambias un
+botón, un mensaje o un método de conexión, actualiza su manual en el mismo commit.** La URL de retorno
+se escribe `{url_retorno}`: nunca un dominio fijo, porque cada instalación tiene el suyo.
+
+---
+
 ## 7b. Informes semanales por email
 
 `portal:informes` (scheduler: **lunes 09:00** Madrid, tras la sync de las 07:30) envía la semana

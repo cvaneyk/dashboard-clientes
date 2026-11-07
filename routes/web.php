@@ -8,6 +8,7 @@ use App\Http\Controllers\Conexiones\MetaConexionController;
 use App\Http\Controllers\Conexiones\SpotifyConexionController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\GlobalesController;
+use App\Http\Controllers\ManualesController;
 use App\Http\Middleware\AplicarAgencia;
 use App\Models\Agencia;
 use App\Models\Cliente;
@@ -68,6 +69,11 @@ Route::middleware(['auth:web,admin', AplicarAgencia::class])->group(function () 
     Route::get('/globales', [GlobalesController::class, 'index'])->name('portal.globales');
     Route::get('/globales/interno', [GlobalesController::class, 'interno'])
         ->name('portal.globales.interno');
+
+    // Manuales de conexión de cada plataforma. Solo admins: lo comprueba el
+    // controlador, igual que en las vistas internas.
+    Route::get('/manuales', [ManualesController::class, 'index'])->name('portal.manuales');
+    Route::get('/manuales/{plataforma}', [ManualesController::class, 'show'])->name('portal.manuales.show');
 
     // Mi cuenta (cambio de contraseña del cliente).
     Route::get('/cuenta', [AccountController::class, 'edit'])->name('portal.cuenta');

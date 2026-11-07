@@ -57,6 +57,13 @@ class EditCuenta extends EditRecord
         return [
             DeleteAction::make(),
 
+            // El manual de la plataforma de este canal, justo donde hace falta.
+            Action::make('manual')
+                ->label('Manual')
+                ->icon('heroicon-o-book-open')
+                ->color('gray')
+                ->url(fn () => route('portal.manuales.show', $this->getRecord()->plataforma), shouldOpenInNewTab: true),
+
             // Estado de la conexión API (hoy, Meta). Abre un desglose en modal.
             Action::make('estadoConexion')
                 ->label(fn () => $this->etiquetaEstado())

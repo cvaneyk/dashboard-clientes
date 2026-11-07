@@ -60,6 +60,10 @@ class AdminPanelProvider extends PanelProvider
                     ->url('/globales/interno', shouldOpenInNewTab: true)
                     ->icon('heroicon-o-banknotes')
                     ->sort(101),
+                NavigationItem::make('Manuales de conexión')
+                    ->url('/manuales', shouldOpenInNewTab: true)
+                    ->icon('heroicon-o-book-open')
+                    ->sort(102),
             ])
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\Filament\Widgets')
             ->widgets([

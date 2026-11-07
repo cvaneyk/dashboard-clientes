@@ -151,6 +151,7 @@
 						<span class="vista">vista de cliente</span>
 						<a class="tlink" href="{{ route('portal.dashboard.interno') }}">Gasto real</a>
 					@endif
+					<a class="tlink" href="{{ route('portal.manuales') }}">Manuales</a>
 					<a class="tlink" href="/admin">← Panel</a>
 				@else
 					<a class="tlink" href="{{ route('portal.cuenta') }}">Mi cuenta</a>
